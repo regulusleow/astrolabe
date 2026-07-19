@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+DerivedData/
+node_modules/
+mcp-adapter/dist/
+*.xcuserdata/
+.DS_Store
+.vscode
+.codegraph/

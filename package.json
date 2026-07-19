@@ -1,0 +1,28 @@
+{
+  "name": "astrolabe",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "mcp-adapter"
+  ],
+  "type": "module",
+  "bin": {
+    "astrolabe-codex-install": "./scripts/install-codex.mjs"
+  },
+  "scripts": {
+    "install:codex": "node scripts/install-codex.mjs",
+    "reinstall:codex": "node scripts/install-codex.mjs",
+    "update:codex": "node scripts/install-codex.mjs --repo https://github.com/regulusleow/astrolabe.git",
+    "check:codex": "node scripts/install-codex.mjs --check",
+    "uninstall:codex": "node scripts/install-codex.mjs --uninstall",
+    "version:check": "node scripts/version-sync.mjs --check",
+    "version:set": "node scripts/version-sync.mjs --set",
+    "release:prepare": "node scripts/release-prepare.mjs",
+    "test": "npm run version:check && node --test test/*.test.mjs && npm --prefix mcp-adapter test",
+    "test:unit": "node --test test/*.test.mjs",
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "test:cli": "node scripts/smoke-test.mjs --cli-only",
+    "test:mcp": "node scripts/smoke-test.mjs --mcp-only",
+    "test:usb": "node scripts/smoke-test.mjs --usb-only"
+  }
+}

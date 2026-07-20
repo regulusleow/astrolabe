@@ -180,6 +180,59 @@ test("installation builds the shared package once and configures every selected 
   ]);
 });
 
+test("installation manages distinct skill directories for different AI clients", () => {
+  const events = [];
+  const registry = new AIClientRegistry([
+    fakeClient("codex", "/tmp/.agents/skills/astrolabe", events),
+    fakeClient("claude-code", "/tmp/.claude/skills/astrolabe", events)
+  ]);
+
+  runInstallation(
+    {
+      action: "install",
+      clientIDs: ["codex", "claude-code"]
+    },
+    {
+      registry,
+      preparePackage: () => events.push("package:prepare"),
+      installSkillLink: (path) => events.push(`skill:install:${path}`),
+      removeSkillLink: () => assert.fail("install must not remove a skill link")
+    }
+  );
+
+  assert.deepEqual(events, [
+    "package:prepare",
+    "skill:install:/tmp/.agents/skills/astrolabe",
+    "skill:install:/tmp/.claude/skills/astrolabe",
+    "codex:install",
+    "claude-code:install"
+  ]);
+});
+
+test("installation check validates skill directories owned by selected clients", () => {
+  const checkedSkillDirectories = [];
+  const registry = new AIClientRegistry([
+    fakeClient("codex", "/tmp/.agents/skills/astrolabe", []),
+    fakeClient("claude-code", "/tmp/.claude/skills/astrolabe", [])
+  ]);
+
+  runInstallation(
+    {
+      action: "check",
+      clientIDs: ["claude-code"]
+    },
+    {
+      registry,
+      checkSharedInstallation(skillDirectories) {
+        checkedSkillDirectories.push(...skillDirectories);
+        return [];
+      }
+    }
+  );
+
+  assert.deepEqual(checkedSkillDirectories, ["/tmp/.claude/skills/astrolabe"]);
+});
+
 test("OpenCode installer requires the exact managed local command", () => {
   const root = mkdtempSync(join(tmpdir(), "astrolabe-opencode-test-"));
   const configPath = join(root, "opencode.json");

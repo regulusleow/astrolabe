@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { parseInstallArgs } from "../scripts/installation/install-options.mjs";
 import { createAIClientRegistry } from "../scripts/installation/install-command.mjs";
+import { defaultClaudeCodeSkillDirectory } from "../scripts/installation/clients/claude-code-installer.mjs";
 
 test("shared installer accepts multiple AI clients without duplicating them", () => {
   const options = parseInstallArgs([
@@ -100,4 +101,19 @@ test("shared installer rejects configuration overrides for unselected clients", 
     () => createAIClientRegistry(options),
     /--client-config provided for unselected AI client: opencode/
   );
+});
+
+test("shared installer registers Claude Code with its user configuration and skill", () => {
+  const options = parseInstallArgs([
+    "--client",
+    "claude-code",
+    "--client-config",
+    "claude-code=/tmp/claude/.claude.json"
+  ]);
+
+  const client = createAIClientRegistry(options).resolve(["claude-code"])[0];
+
+  assert.equal(client.id, "claude-code");
+  assert.equal(client.configPath, "/tmp/claude/.claude.json");
+  assert.deepEqual(client.skillDirectories, [defaultClaudeCodeSkillDirectory()]);
 });

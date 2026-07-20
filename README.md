@@ -34,20 +34,22 @@ git clone https://github.com/regulusleow/astrolabe.git
 cd astrolabe
 npm run install:codex
 npm run install:opencode
+npm run install:claude-code
 ```
 
-Codex and OpenCode can be installed independently or together. A multi-client
-installation builds the shared package once:
+Codex, OpenCode, and Claude Code can be installed independently or together. A
+multi-client installation builds the shared package once:
 
 ```bash
-node scripts/install.mjs --client codex --client opencode
+node scripts/install.mjs --client codex --client opencode --client claude-code
 ```
 
 The installer places shared artifacts under `~/.astrolabe/package` and links
-the bundled skill at `~/.agents/skills/astrolabe`. Each client adapter owns only
-its MCP configuration: Codex uses `~/.codex/config.toml`, while OpenCode uses
-`~/.config/opencode/opencode.json`. Installing or uninstalling one client does
-not remove another client's configuration.
+the bundled skill into each client's supported user-level skill directory.
+Each client adapter owns only its MCP configuration: Codex uses
+`~/.codex/config.toml`, OpenCode uses `~/.config/opencode/opencode.json`, and
+Claude Code uses `~/.claude.json`. Installing or uninstalling one client does
+not remove another client's configuration or required skill link.
 
 Restart the configured AI clients after installation.
 
@@ -63,6 +65,11 @@ npm run reinstall:opencode
 npm run update:opencode
 npm run check:opencode
 npm run uninstall:opencode
+
+npm run reinstall:claude-code
+npm run update:claude-code
+npm run check:claude-code
+npm run uninstall:claude-code
 ```
 
 ## Quick Start
@@ -88,10 +95,10 @@ Hierarchy commands return a `snapshotId`. Pass it to subsequent hierarchy,
 node, style, and layout commands to keep the workflow bound to the captured
 page. Screenshot and visual comparison commands always use the latest screen.
 
-The installed MCP server exposes the same capabilities to Codex and OpenCode.
-The bundled skill guides app discovery, snapshot reuse, node selection,
-runtime checks, screenshots, visual comparison, and temporary presentation
-experiments.
+The installed MCP server exposes the same capabilities to Codex, OpenCode, and
+Claude Code. The bundled skill guides app discovery, snapshot reuse, node
+selection, runtime checks, screenshots, visual comparison, and temporary
+presentation experiments.
 
 ## Development
 
@@ -130,7 +137,7 @@ platform Runtime implementation package.
 ## Roadmap
 
 - Android Runtime and Host support.
-- Integrations for additional AI coding platforms, including Claude Code.
+- Integrations for additional AI coding platforms.
 
 ## License
 

@@ -1,4 +1,9 @@
 import { AIClientRegistry } from "./ai-client-registry.mjs";
+import {
+  ClaudeCodeInstaller,
+  defaultClaudeCodeConfigPath,
+  defaultClaudeCodeSkillDirectory
+} from "./clients/claude-code-installer.mjs";
 import { CodexInstaller, defaultCodexConfigPath } from "./clients/codex-installer.mjs";
 import { OpenCodeInstaller, defaultOpenCodeConfigPath } from "./clients/opencode-installer.mjs";
 import { runInstallation } from "./installation-orchestrator.mjs";
@@ -20,17 +25,23 @@ export function createAIClientRegistry(options) {
   const sharedClientOptions = {
     serverName: options.serverName,
     packagePaths,
-    skillDirectories: [options.userSkillDir],
     dryRun: options.dryRun
   };
   const registry = new AIClientRegistry([
     new CodexInstaller({
       ...sharedClientOptions,
+      skillDirectories: [options.userSkillDir],
       configPath: options.clientConfigPaths.codex ?? defaultCodexConfigPath()
     }),
     new OpenCodeInstaller({
       ...sharedClientOptions,
+      skillDirectories: [options.userSkillDir],
       configPath: options.clientConfigPaths.opencode ?? defaultOpenCodeConfigPath()
+    }),
+    new ClaudeCodeInstaller({
+      ...sharedClientOptions,
+      skillDirectories: [defaultClaudeCodeSkillDirectory()],
+      configPath: options.clientConfigPaths["claude-code"] ?? defaultClaudeCodeConfigPath()
     })
   ]);
   validateClientConfigOverrides(options, registry);
@@ -49,9 +60,10 @@ function validateClientConfigOverrides(options, registry) {
 
 export function printHelp() {
   process.stdout.write(`Usage:
-  astrolabe-install --client <codex|opencode> [--client <client>]
+  astrolabe-install --client <codex|opencode|claude-code> [--client <client>]
   npm run install:codex
   npm run install:opencode
+  npm run install:claude-code
 
 Options:
   --client <name>             AI client to configure; repeat to install multiple clients
@@ -88,10 +100,12 @@ export function executeInstallation(options) {
     removeSkillLink(skillDirectory) {
       removeManagedSkillLink(skillDirectory, packagePaths.skillDir, options.dryRun);
     },
-    checkSharedInstallation() {
+    checkSharedInstallation(skillDirectories) {
       return [
         ...checkRuntimePackage(options.packageDir),
-        ...checkManagedSkillLink(options.userSkillDir, packagePaths.skillDir)
+        ...skillDirectories.flatMap((skillDirectory) => (
+          checkManagedSkillLink(skillDirectory, packagePaths.skillDir)
+        ))
       ];
     }
   });

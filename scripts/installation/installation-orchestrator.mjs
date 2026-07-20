@@ -48,7 +48,7 @@ function shouldRetainSharedResources(client) {
 }
 
 function checkClients(clients, dependencies) {
-  const sharedProblems = dependencies.checkSharedInstallation?.() ?? [];
+  const sharedProblems = dependencies.checkSharedInstallation?.(uniqueSkillDirectories(clients)) ?? [];
   const problems = [...sharedProblems, ...clients.flatMap((client) => client.check())];
   if (problems.length > 0) {
     throw new Error(`Failed: local installation check failed:\n${problems.join("\n")}`);

@@ -9,16 +9,21 @@ import {
 } from "../jsonc-config-editor.mjs";
 import { writeManagedConfig } from "../managed-config-file.mjs";
 
-export function defaultOpenCodeConfigPath() {
-  return process.env.OPENCODE_CONFIG
-    ? expandHome(process.env.OPENCODE_CONFIG)
-    : join(homedir(), ".config", "opencode", "opencode.json");
+const configurationName = "Claude Code";
+const containerKey = "mcpServers";
+
+export function defaultClaudeCodeConfigPath(environment = process.env, homeDirectory = homedir()) {
+  const configDirectory = claudeCodeConfigDirectory(environment, homeDirectory);
+  return environment.CLAUDE_CONFIG_DIR
+    ? join(configDirectory, ".claude.json")
+    : join(homeDirectory, ".claude.json");
 }
 
-const configurationName = "OpenCode";
-const containerKey = "mcp";
+export function defaultClaudeCodeSkillDirectory(environment = process.env, homeDirectory = homedir()) {
+  return join(claudeCodeConfigDirectory(environment, homeDirectory), "skills", "astrolabe");
+}
 
-export class OpenCodeInstaller {
+export class ClaudeCodeInstaller {
   constructor({
     configPath,
     serverName,
@@ -26,7 +31,7 @@ export class OpenCodeInstaller {
     skillDirectories,
     dryRun
   }) {
-    this.id = "opencode";
+    this.id = "claude-code";
     this.configPath = configPath;
     this.serverName = serverName;
     this.packagePaths = packagePaths;
@@ -36,7 +41,7 @@ export class OpenCodeInstaller {
 
   install() {
     const currentText = existsSync(this.configPath) ? readFileSync(this.configPath, "utf8") : "";
-    const nextText = upsertOpenCodeServerConfig(currentText, this.#serverConfig());
+    const nextText = upsertClaudeCodeServerConfig(currentText, this.#serverConfig());
     if (this.dryRun || currentText === nextText) {
       return;
     }
@@ -48,7 +53,7 @@ export class OpenCodeInstaller {
       return;
     }
     const currentText = readFileSync(this.configPath, "utf8");
-    const nextText = removeOpenCodeServerConfig(currentText, this.serverName);
+    const nextText = removeClaudeCodeServerConfig(currentText, this.serverName);
     if (this.dryRun || currentText === nextText) {
       return;
     }
@@ -57,7 +62,7 @@ export class OpenCodeInstaller {
 
   check() {
     if (!existsSync(this.configPath)) {
-      return [`OpenCode configuration not found: ${this.configPath}`];
+      return [`Claude Code configuration not found: ${this.configPath}`];
     }
     let config;
     try {
@@ -67,26 +72,23 @@ export class OpenCodeInstaller {
     }
     const entry = config[containerKey]?.[this.serverName];
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
-      return [`OpenCode configuration is missing mcp.${this.serverName}`];
+      return [`Claude Code configuration is missing ${containerKey}.${this.serverName}`];
     }
 
     const problems = [];
-    if (entry.type !== "local") {
-      problems.push(`OpenCode MCP server must use local transport: ${this.serverName}`);
+    if (entry.type !== "stdio") {
+      problems.push(`Claude Code MCP server must use stdio transport: ${this.serverName}`);
     }
     if (
-      !Array.isArray(entry.command)
-      || entry.command.length !== 2
-      || entry.command[0] !== "node"
-      || entry.command[1] !== this.packagePaths.mcpEntryPath
+      entry.command !== "node"
+      || !Array.isArray(entry.args)
+      || entry.args.length !== 1
+      || entry.args[0] !== this.packagePaths.mcpEntryPath
     ) {
-      problems.push(`OpenCode configuration does not point to the MCP adapter: ${this.packagePaths.mcpEntryPath}`);
+      problems.push(`Claude Code configuration does not use the managed MCP command: ${this.serverName}`);
     }
-    if (entry.environment?.ASTROLABE_BIN !== this.packagePaths.inspectorBinPath) {
-      problems.push(`OpenCode configuration does not point to the CLI binary: ${this.packagePaths.inspectorBinPath}`);
-    }
-    if (entry.enabled !== true) {
-      problems.push(`OpenCode MCP server must be enabled: ${this.serverName}`);
+    if (entry.env?.ASTROLABE_BIN !== this.packagePaths.inspectorBinPath) {
+      problems.push(`Claude Code configuration does not point to the CLI binary: ${this.packagePaths.inspectorBinPath}`);
     }
     return problems;
   }
@@ -108,31 +110,30 @@ export class OpenCodeInstaller {
   }
 }
 
-export function renderOpenCodeServerConfig({
+export function renderClaudeCodeServerConfig({
   mcpEntryPath,
   inspectorBinPath
 }) {
   return {
-    type: "local",
-    command: ["node", mcpEntryPath],
-    enabled: true,
-    environment: {
+    type: "stdio",
+    command: "node",
+    args: [mcpEntryPath],
+    env: {
       ASTROLABE_BIN: inspectorBinPath
-    },
-    timeout: 120000
+    }
   };
 }
 
-export function upsertOpenCodeServerConfig(configText, serverConfig) {
+export function upsertClaudeCodeServerConfig(configText, serverConfig) {
   return upsertJSONCEntry(configText, {
     configurationName,
     containerKey,
     entryKey: serverConfig.serverName,
-    value: renderOpenCodeServerConfig(serverConfig)
+    value: renderClaudeCodeServerConfig(serverConfig)
   });
 }
 
-export function removeOpenCodeServerConfig(configText, serverName) {
+export function removeClaudeCodeServerConfig(configText, serverName) {
   return removeJSONCEntry(configText, {
     configurationName,
     containerKey,
@@ -140,12 +141,16 @@ export function removeOpenCodeServerConfig(configText, serverName) {
   });
 }
 
-function expandHome(value) {
-  if (value === "~") {
-    return homedir();
+function claudeCodeConfigDirectory(environment, homeDirectory) {
+  const configuredDirectory = environment.CLAUDE_CONFIG_DIR;
+  if (!configuredDirectory) {
+    return join(homeDirectory, ".claude");
   }
-  if (value.startsWith("~/")) {
-    return join(homedir(), value.slice(2));
+  if (configuredDirectory === "~") {
+    return homeDirectory;
   }
-  return value;
+  if (configuredDirectory.startsWith("~/")) {
+    return join(homeDirectory, configuredDirectory.slice(2));
+  }
+  return configuredDirectory;
 }

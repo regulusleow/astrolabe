@@ -80,20 +80,36 @@ test("Astrolabe skill is platform-neutral and capability-driven", async () => {
   assert.doesNotMatch(skill, /`ios_[a-z_]+`|`android_[a-z_]+`/);
 });
 
-test("Codex reinstall and update commands reuse the managed installer", async () => {
+test("AI client commands reuse the shared installer", async () => {
   const rootPackage = JSON.parse(await readProjectFile("package.json"));
+  const packageLock = JSON.parse(await readProjectFile("package-lock.json"));
   const readme = await readProjectFile("README.md");
+
+  const normalizedPackageBins = Object.fromEntries(
+    Object.entries(rootPackage.bin).map(([name, path]) => [name, path.replace(/^\.\//, "")])
+  );
+  assert.deepEqual(packageLock.packages[""].bin, normalizedPackageBins);
 
   assert.equal(
     rootPackage.scripts["reinstall:codex"],
-    "node scripts/install-codex.mjs"
+    "node scripts/install.mjs --client codex"
   );
   assert.equal(
     rootPackage.scripts["update:codex"],
-    "node scripts/install-codex.mjs --repo https://github.com/regulusleow/astrolabe.git"
+    "node scripts/install.mjs --client codex --repo https://github.com/regulusleow/astrolabe.git"
+  );
+  assert.equal(
+    rootPackage.scripts["reinstall:opencode"],
+    "node scripts/install.mjs --client opencode"
+  );
+  assert.equal(
+    rootPackage.scripts["update:opencode"],
+    "node scripts/install.mjs --client opencode --repo https://github.com/regulusleow/astrolabe.git"
   );
   assert.match(readme, /npm run reinstall:codex/);
   assert.match(readme, /npm run update:codex/);
+  assert.match(readme, /npm run install:opencode/);
+  assert.match(readme, /npm run check:opencode/);
 });
 
 test("release commands remain available to maintainers", async () => {

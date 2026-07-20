@@ -1,24 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import {
-  assertSafePackageDir,
-  artifactPaths,
-  assertSkillMetadata,
-  installRuntimePackage,
-  packageArtifactPaths,
-  parseInstallArgs,
   removeCodexSkillConfig,
   removeCodexServerConfig,
   renderCodexServerConfig,
-  sourceArtifactPaths,
-  upsertCodexServerConfig,
+  upsertCodexServerConfig
+} from "../scripts/installation/clients/codex-installer.mjs";
+import {
+  packageArtifactPaths,
+  sourceArtifactPaths
+} from "../scripts/installation/package-layout.mjs";
+import {
+  assertSafePackageDir,
+  assertSkillMetadata,
+  installRuntimePackage,
   replaceRuntimePackage,
-  userSkillPaths
-} from "../scripts/install-codex.mjs";
+} from "../scripts/installation/runtime-package-installer.mjs";
+import { parseInstallArgs } from "../scripts/installation/install-options.mjs";
+import {
+  checkManagedSkillLink,
+  installManagedSkillLink,
+  removeManagedSkillLink
+} from "../scripts/installation/managed-skill-link.mjs";
 
 const validSkill = `---
 name: astrolabe
@@ -116,17 +123,18 @@ test("Codex installer can remove managed sections", () => {
 
 test("Codex installer maps repo installs to the install directory", () => {
   const options = parseInstallArgs([
+    "--client",
+    "codex",
     "--repo",
     "https://github.com/regulusleow/astrolabe.git",
     "--install-dir",
     "/tmp/astrolabe-install",
     "--package-dir",
     "/tmp/astrolabe-package",
-    "--config",
-    "/tmp/codex/config.toml"
+    "--client-config",
+    "codex=/tmp/codex/config.toml"
   ], {
     projectRoot: "/local/project",
-    configPath: "/default/config.toml",
     packageDir: "/default/package"
   });
 
@@ -134,14 +142,12 @@ test("Codex installer maps repo installs to the install directory", () => {
   assert.equal(options.projectRoot, "/tmp/astrolabe-install");
   assert.equal(options.installDir, "/tmp/astrolabe-install");
   assert.equal(options.packageDir, "/tmp/astrolabe-package");
-  assert.equal(options.configPath, "/tmp/codex/config.toml");
+  assert.equal(options.clientConfigPaths.codex, "/tmp/codex/config.toml");
 });
 
 test("Codex installer separates source artifacts from package artifacts", () => {
   const sourcePaths = sourceArtifactPaths("/tmp/astrolabe-source");
   const packagePaths = packageArtifactPaths("/tmp/astrolabe-package");
-  const compatPaths = artifactPaths("/tmp/astrolabe-package");
-  const userPaths = userSkillPaths("/tmp/agents-skills/astrolabe");
 
   assert.equal(sourcePaths.inspectorBuildPath, "/tmp/astrolabe-source/.build/release/astrolabe");
   assert.equal(sourcePaths.mcpEntryPath, "/tmp/astrolabe-source/mcp-adapter/dist/index.js");
@@ -149,8 +155,6 @@ test("Codex installer separates source artifacts from package artifacts", () => 
   assert.equal(packagePaths.inspectorBinPath, "/tmp/astrolabe-package/bin/astrolabe");
   assert.equal(packagePaths.mcpEntryPath, "/tmp/astrolabe-package/mcp-adapter/dist/index.js");
   assert.equal(packagePaths.skillPath, "/tmp/astrolabe-package/skills/astrolabe/SKILL.md");
-  assert.equal(userPaths.skillPath, "/tmp/agents-skills/astrolabe/SKILL.md");
-  assert.deepEqual(compatPaths, packagePaths);
 });
 
 test("Codex installer installs packaged MCP dependencies from the package directory", () => {
@@ -262,6 +266,42 @@ test("Codex installer restores the previous package when replacement fails", () 
       () => replaceRuntimePackage(join(root, "missing-staging"), packageDir)
     );
     assert.equal(readFileSync(join(packageDir, "version"), "utf8"), "old");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shared installer manages one agent-compatible skill link", () => {
+  const root = mkdtempSync(join(tmpdir(), "astrolabe-skill-link-test-"));
+  const packageSkillDir = join(root, "package/skills/astrolabe");
+  const userSkillDir = join(root, "agents/skills/astrolabe");
+  mkdirSync(packageSkillDir, { recursive: true });
+  writeFileSync(join(packageSkillDir, "SKILL.md"), validSkill);
+
+  try {
+    installManagedSkillLink(userSkillDir, packageSkillDir, false);
+    assert.equal(realpathSync(userSkillDir), realpathSync(packageSkillDir));
+    assert.deepEqual(checkManagedSkillLink(userSkillDir, packageSkillDir), []);
+    assert.equal(removeManagedSkillLink(userSkillDir, packageSkillDir, false), true);
+    assert.equal(existsSync(userSkillDir), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("shared installer never replaces an unmanaged skill directory", () => {
+  const root = mkdtempSync(join(tmpdir(), "astrolabe-skill-link-test-"));
+  const packageSkillDir = join(root, "package/skills/astrolabe");
+  const userSkillDir = join(root, "agents/skills/astrolabe");
+  mkdirSync(packageSkillDir, { recursive: true });
+  mkdirSync(userSkillDir, { recursive: true });
+
+  try {
+    assert.throws(
+      () => installManagedSkillLink(userSkillDir, packageSkillDir, false),
+      /skill directory exists and is not a symbolic link/
+    );
+    assert.equal(removeManagedSkillLink(userSkillDir, packageSkillDir, false), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

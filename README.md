@@ -1,7 +1,7 @@
 # Astrolabe
 
 Astrolabe is a runtime UI inspection tool for AI coding agents. It combines a
-Swift CLI, a local MCP server, and a packaged Codex skill to inspect and verify
+Swift CLI, a local MCP server, and a packaged agent skill to inspect and verify
 running mobile interfaces.
 
 ## Features
@@ -27,20 +27,29 @@ running mobile interfaces.
 
 ## Installation
 
-Clone the repository and install Astrolabe for Codex:
+Clone the repository, then install Astrolabe for the AI clients you use:
 
 ```bash
 git clone https://github.com/regulusleow/astrolabe.git
 cd astrolabe
 npm run install:codex
+npm run install:opencode
 ```
 
-The installer builds the CLI and MCP adapter, installs the package under
-`~/.astrolabe/package`, links the bundled skill into
-`~/.agents/skills/astrolabe`, and updates the managed Astrolabe sections in
-`~/.codex/config.toml`.
+Codex and OpenCode can be installed independently or together. A multi-client
+installation builds the shared package once:
 
-Restart Codex or open a new Codex session after installation.
+```bash
+node scripts/install.mjs --client codex --client opencode
+```
+
+The installer places shared artifacts under `~/.astrolabe/package` and links
+the bundled skill at `~/.agents/skills/astrolabe`. Each client adapter owns only
+its MCP configuration: Codex uses `~/.codex/config.toml`, while OpenCode uses
+`~/.config/opencode/opencode.json`. Installing or uninstalling one client does
+not remove another client's configuration.
+
+Restart the configured AI clients after installation.
 
 Installation management commands:
 
@@ -49,6 +58,11 @@ npm run reinstall:codex
 npm run update:codex
 npm run check:codex
 npm run uninstall:codex
+
+npm run reinstall:opencode
+npm run update:opencode
+npm run check:opencode
+npm run uninstall:opencode
 ```
 
 ## Quick Start
@@ -74,10 +88,10 @@ Hierarchy commands return a `snapshotId`. Pass it to subsequent hierarchy,
 node, style, and layout commands to keep the workflow bound to the captured
 page. Screenshot and visual comparison commands always use the latest screen.
 
-The installed MCP server exposes the same capabilities to Codex. The bundled
-skill guides app discovery, snapshot reuse, node selection, runtime checks,
-screenshots, visual comparison, and temporary presentation experiments.
-Codex is currently the only officially supported AI coding platform.
+The installed MCP server exposes the same capabilities to Codex and OpenCode.
+The bundled skill guides app discovery, snapshot reuse, node selection,
+runtime checks, screenshots, visual comparison, and temporary presentation
+experiments.
 
 ## Development
 
@@ -116,7 +130,7 @@ platform Runtime implementation package.
 ## Roadmap
 
 - Android Runtime and Host support.
-- Integrations for additional AI coding platforms.
+- Integrations for additional AI coding platforms, including Claude Code.
 
 ## License
 

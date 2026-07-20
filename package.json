@@ -7,14 +7,19 @@
   ],
   "type": "module",
   "bin": {
-    "astrolabe-codex-install": "./scripts/install-codex.mjs"
+    "astrolabe-install": "./scripts/install.mjs"
   },
   "scripts": {
-    "install:codex": "node scripts/install-codex.mjs",
-    "reinstall:codex": "node scripts/install-codex.mjs",
-    "update:codex": "node scripts/install-codex.mjs --repo https://github.com/regulusleow/astrolabe.git",
-    "check:codex": "node scripts/install-codex.mjs --check",
-    "uninstall:codex": "node scripts/install-codex.mjs --uninstall",
+    "install:codex": "node scripts/install.mjs --client codex",
+    "reinstall:codex": "node scripts/install.mjs --client codex",
+    "update:codex": "node scripts/install.mjs --client codex --repo https://github.com/regulusleow/astrolabe.git",
+    "check:codex": "node scripts/install.mjs --client codex --check",
+    "uninstall:codex": "node scripts/install.mjs --client codex --uninstall",
+    "install:opencode": "node scripts/install.mjs --client opencode",
+    "reinstall:opencode": "node scripts/install.mjs --client opencode",
+    "update:opencode": "node scripts/install.mjs --client opencode --repo https://github.com/regulusleow/astrolabe.git",
+    "check:opencode": "node scripts/install.mjs --client opencode --check",
+    "uninstall:opencode": "node scripts/install.mjs --client opencode --uninstall",
     "version:check": "node scripts/version-sync.mjs --check",
     "version:set": "node scripts/version-sync.mjs --set",
     "release:prepare": "node scripts/release-prepare.mjs",
@@ -24,5 +29,8 @@
     "test:cli": "node scripts/smoke-test.mjs --cli-only",
     "test:mcp": "node scripts/smoke-test.mjs --mcp-only",
     "test:usb": "node scripts/smoke-test.mjs --usb-only"
+  },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
   }
 }

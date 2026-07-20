@@ -1,5 +1,7 @@
 # Astrolabe
 
+English | [简体中文](README.zh-CN.md)
+
 Astrolabe is a runtime UI inspection tool for AI coding agents. It combines a
 Swift CLI, a local MCP server, and a packaged agent skill to inspect and verify
 running mobile interfaces.

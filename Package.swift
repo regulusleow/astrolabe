@@ -44,6 +44,11 @@ let package = Package(
             path: "Sources/AstrolabeIOSInspection"
         ),
         .target(
+            name: "AstrolabeAndroidInspection",
+            dependencies: ["AstrolabeCLI"],
+            path: "Sources/AstrolabeAndroidInspection"
+        ),
+        .target(
             name: "AstrolabeIOSDeviceSupport",
             dependencies: ["AstrolabeCoreObjC"],
             path: "Sources/AstrolabeIOSDeviceSupport"
@@ -77,6 +82,11 @@ let package = Package(
             name: "AstrolabeCLITests",
             dependencies: ["AstrolabeCLI"],
             path: "Tests/AstrolabeCLITests"
+        ),
+        .testTarget(
+            name: "AstrolabeAndroidInspectionTests",
+            dependencies: ["AstrolabeAndroidInspection", "AstrolabeCLI"],
+            path: "Tests/AstrolabeAndroidInspectionTests"
         ),
         .testTarget(
             name: "AstrolabeIOSHostTests",

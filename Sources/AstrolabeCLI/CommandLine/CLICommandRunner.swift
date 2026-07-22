@@ -222,6 +222,14 @@ package struct CLICommandRunner {
         return try handler.run(command: command, arguments: arguments)
     }
 
+    package func runJSON(arguments: [String]) throws -> [String: Any] {
+        let output = try run(arguments: arguments)
+        guard case .jsonObject(let object) = output else {
+            throw CLIError.commandFailed("Command does not produce a JSON object")
+        }
+        return object
+    }
+
     package func runAndPrint(arguments: [String]) -> Int32 {
         do {
             let output = try run(arguments: arguments)

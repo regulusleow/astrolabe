@@ -7,6 +7,7 @@
 
 import AstrolabeAndroidInspection
 import AstrolabeCLI
+import AstrolabeProtocol
 import XCTest
 
 final class AndroidInspectionCommandIntegrationTests: XCTestCase {
@@ -15,6 +16,8 @@ final class AndroidInspectionCommandIntegrationTests: XCTestCase {
         let module = try HostPlatformModuleBuilder(provider: provider)
             .hierarchyCapture(provider)
             .nodeDetail(provider)
+            .patchCatalog(provider)
+            .attributePatching(provider)
             .screenInspectionBuilder(
                 ScreenInspectionBuilder(
                     qualityPolicy: AndroidScreenInspectionTargetQualityPolicy()
@@ -78,6 +81,42 @@ final class AndroidInspectionCommandIntegrationTests: XCTestCase {
             "#102030"
         ]))
         XCTAssertEqual(styleCheck["passed"] as? Bool, true)
+
+        let patchCatalog = try data(from: runner.runJSON(arguments: [
+            "list-patchable-attributes",
+            provider.appID
+        ]))
+        XCTAssertEqual(patchCatalog["attributeCount"] as? Int, 1)
+
+        _ = try data(from: runner.runJSON(arguments: [
+            "apply-attribute-patch",
+            provider.appID,
+            "2",
+            "--attribute",
+            "android.text.fontSize",
+            "--value",
+            "20"
+        ]))
+        XCTAssertEqual(
+            provider.lastAppliedValue,
+            .measurement(RuntimeMeasurement(value: 20, unit: .scaledLogical))
+        )
+
+        _ = try data(from: runner.runJSON(arguments: [
+            "list-attribute-patches",
+            provider.appID
+        ]))
+        _ = try data(from: runner.runJSON(arguments: [
+            "revert-attribute-patch",
+            provider.appID,
+            "patch-android-1"
+        ]))
+        _ = try data(from: runner.runJSON(arguments: [
+            "clear-attribute-patches",
+            provider.appID
+        ]))
+        XCTAssertEqual(provider.revertedPatchID, "patch-android-1")
+        XCTAssertTrue(provider.didClearPatches)
     }
 
     private func data(from object: [String: Any]) throws -> [String: Any] {
@@ -88,7 +127,9 @@ final class AndroidInspectionCommandIntegrationTests: XCTestCase {
 private final class FakeAndroidInspectionProvider:
     RuntimeUIProviderTargeting,
     RuntimeUIHierarchyCapturing,
-    RuntimeUINodeDetailProviding {
+    RuntimeUINodeDetailProviding,
+    RuntimeUIPatchCatalogProviding,
+    RuntimeUIAttributePatching {
     /// Stable app identifier handled by this fake Provider.
     let appID = "android:demo"
 
@@ -96,8 +137,22 @@ private final class FakeAndroidInspectionProvider:
     let descriptor = RuntimeUIProviderDescriptor(
         identifier: "fake-android-provider",
         platform: .android,
-        capabilities: [.hierarchy, .nodeDetail]
+        capabilities: [
+            .hierarchy,
+            .nodeDetail,
+            .attributePatchDiscovery,
+            .attributePatching
+        ]
     )
+
+    /// Most recent typed value received from the platform-neutral patch command.
+    var lastAppliedValue: RuntimeAttributeValue?
+
+    /// Most recent patch identifier requested for reversion.
+    var revertedPatchID: String?
+
+    /// Whether the clear lifecycle command reached this Provider.
+    var didClearPatches = false
 
     func canHandle(appId: String) -> Bool {
         appId == appID
@@ -182,6 +237,56 @@ private final class FakeAndroidInspectionProvider:
                 ]]
             ]]
         ]
+    }
+
+    func fetchPatchableAttributeCatalog(
+        appId: String
+    ) throws -> RuntimePatchableAttributesPayload {
+        RuntimePatchableAttributesPayload(
+            attributes: [
+                try RuntimePatchableAttribute(
+                    attributePattern: "android.text.fontSize",
+                    valueType: RuntimePatchValueType(rawValue: "measurement"),
+                    targetRoles: ["text"],
+                    valueConstraints: RuntimePatchValueConstraints(
+                        minimum: 0,
+                        maximum: nil,
+                        minimumExclusive: true,
+                        maximumExclusive: false,
+                        acceptedFormats: ["scaledLogical"],
+                        allowedValues: []
+                    ),
+                    extensions: RuntimeExtensionMap()
+                )
+            ]
+        )
+    }
+
+    func applyAttributePatch(
+        appId: String,
+        oid: String,
+        attributeIdentifier: String,
+        value: RuntimeAttributeValue
+    ) throws -> [String: Any] {
+        lastAppliedValue = value
+        return ["patchID": "patch-android-1"]
+    }
+
+    func fetchAttributePatches(appId: String) throws -> [String: Any] {
+        ["patches": []]
+    }
+
+    func revertAttributePatch(
+        appId: String,
+        patchID: String
+    ) throws -> [String: Any] {
+        revertedPatchID = patchID
+        return ["revertedPatchID": patchID]
+    }
+
+    func clearAttributePatches(appId: String) throws -> [String: Any] {
+        didClearPatches = true
+        return ["remainingPatchCount": 0]
     }
 
     private func node(

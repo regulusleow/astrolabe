@@ -94,7 +94,12 @@ struct RuntimeAttributePatchValueParser {
         _ rawValue: String,
         for attribute: RuntimePatchableAttribute
     ) throws -> RuntimeAttributeValue {
-        let value = try parse(rawValue, valueType: attribute.valueType)
+        let value: RuntimeAttributeValue
+        if attribute.valueType.rawValue == "measurement" {
+            value = try measurement(rawValue, constraints: attribute.valueConstraints)
+        } else {
+            value = try parse(rawValue, valueType: attribute.valueType)
+        }
         try validate(value, for: attribute)
         return value
     }
@@ -137,12 +142,43 @@ struct RuntimeAttributePatchValueParser {
         return RuntimeMeasuredSize(width: width, height: height, unit: .logical)
     }
 
+    private func measurement(
+        _ value: String,
+        constraints: RuntimePatchValueConstraints?
+    ) throws -> RuntimeAttributeValue {
+        guard let formats = constraints?.acceptedFormats,
+              formats.count == 1,
+              let format = formats.first,
+              let unit = RuntimeMeasurementUnit(rawValue: format) else {
+            throw CLIError.invalidArgument(
+                "Measurement attributes must declare exactly one supported unit"
+            )
+        }
+        return .measurement(
+            RuntimeMeasurement(value: try decimal(value), unit: unit)
+        )
+    }
+
     private func validate(
         _ value: RuntimeAttributeValue,
         for attribute: RuntimePatchableAttribute
     ) throws {
-        guard case let .number(number) = value,
-              let constraints = attribute.valueConstraints else {
+        guard let constraints = attribute.valueConstraints else {
+            return
+        }
+        if !constraints.allowedValues.isEmpty,
+           !constraints.allowedValues.contains(value) {
+            throw CLIError.invalidArgument(
+                "\(attribute.attributePattern) is not one of the allowed values"
+            )
+        }
+        let number: Double
+        switch value {
+        case .number(let value):
+            number = value
+        case .measurement(let measurement):
+            number = measurement.value
+        default:
             return
         }
         if let minimum = constraints.minimum {

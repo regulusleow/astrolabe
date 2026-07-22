@@ -85,7 +85,14 @@ let package = Package(
         ),
         .testTarget(
             name: "AstrolabeAndroidInspectionTests",
-            dependencies: ["AstrolabeAndroidInspection", "AstrolabeCLI"],
+            dependencies: [
+                "AstrolabeAndroidInspection",
+                "AstrolabeCLI",
+                .product(
+                    name: "AstrolabeProtocol",
+                    package: "astrolabe-protocol"
+                )
+            ],
             path: "Tests/AstrolabeAndroidInspectionTests"
         ),
         .testTarget(

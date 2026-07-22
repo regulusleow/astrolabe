@@ -2,47 +2,36 @@
 //  AstrolabeRuntimeCompatibility.swift
 //  astrolabe
 //
-//  Created by 轩辕十四 on 2026/7/11.
+//  Created by 轩辕十四 on 2026/7/22.
 //
 
 import AstrolabeCLI
 import AstrolabeProtocol
 
-enum AstrolabeRuntimeCompatibilityMessage {
-    static func updateSuggestion(
-        runtimeVersion: String,
-        missingCapabilities: [String]
-    ) -> String {
-        "Astrolabe Runtime \(runtimeVersion) is missing capabilities: \(missingCapabilities.joined(separator: ", ")). Update astrolabe-runtime-ios, then rebuild and launch the app"
-    }
-}
-
-struct AstrolabeRuntimeCompatibility {
+package struct AstrolabeRuntimeCompatibility {
     /// Compatibility diagnostic suitable for direct CLI and MCP output.
-    let record: RuntimeCompatibilityRecord
+    package let record: RuntimeCompatibilityRecord
 
-    /// Host Provider capabilities actually supported by the current Runtime.
-    let supportedProviderCapabilities: Set<RuntimeUICapability>
+    /// Host Provider capabilities supported by the Runtime.
+    package let supportedProviderCapabilities: Set<RuntimeUICapability>
 
     /// Raw capability set declared by the Runtime handshake.
-    let runtimeCapabilities: Set<RuntimeCapability>
+    package let runtimeCapabilities: Set<RuntimeCapability>
 
-    /// Whether the Runtime runs on the platform owned by the current Provider.
-    let isExpectedPlatform: Bool
+    /// Whether the Runtime platform matches the current Provider.
+    package let isExpectedPlatform: Bool
 }
 
-struct AstrolabeRuntimeCompatibilityPolicy {
-    private let expectedPlatform = "ios"
+package struct AstrolabeRuntimeCompatibilityPolicy {
+    private let platform: RuntimeUIPlatform
+    private let runtimePackageName: String
     private let requirementsByProviderCapability: [
         RuntimeUICapability: Set<RuntimeCapability>
     ] = [
         .appDiscovery: [],
         .hierarchy: [.applicationInfo, .hierarchySnapshot],
         .nodeDetail: [.applicationInfo, .hierarchySnapshot, .nodeDetail],
-        .attributePatchDiscovery: [
-            .applicationInfo,
-            .attributePatchDiscovery
-        ],
+        .attributePatchDiscovery: [.applicationInfo, .attributePatchDiscovery],
         .attributePatching: [
             .applicationInfo,
             .hierarchySnapshot,
@@ -52,16 +41,24 @@ struct AstrolabeRuntimeCompatibilityPolicy {
         ]
     ]
 
-    func evaluate(
+    package init(
+        platform: RuntimeUIPlatform,
+        runtimePackageName: String
+    ) {
+        self.platform = platform
+        self.runtimePackageName = runtimePackageName
+    }
+
+    package func evaluate(
         handshake: RuntimeHandshakePayload
     ) -> AstrolabeRuntimeCompatibility {
         let runtimeCapabilities = Set(handshake.capabilities)
-        let isExpectedPlatform = handshake.platform == expectedPlatform
-        let fullySupportedCapabilities = requirementsByProviderCapability.values
+        let isExpectedPlatform = handshake.platform == platform.rawValue
+        let requiredCapabilities = requirementsByProviderCapability.values
             .reduce(into: Set<RuntimeCapability>()) { result, requirements in
                 result.formUnion(requirements)
             }
-        let missingCapabilities = fullySupportedCapabilities
+        let missingCapabilities = requiredCapabilities
             .subtracting(runtimeCapabilities)
             .map(\.rawValue)
             .sorted()
@@ -73,11 +70,6 @@ struct AstrolabeRuntimeCompatibilityPolicy {
         } else {
             status = .updateRequired
         }
-        let recoverySuggestion = suggestion(
-            status: status,
-            runtimeVersion: handshake.runtime.version,
-            missingCapabilities: missingCapabilities
-        )
         return AstrolabeRuntimeCompatibility(
             record: RuntimeCompatibilityRecord(
                 status: status,
@@ -87,11 +79,13 @@ struct AstrolabeRuntimeCompatibilityPolicy {
                     major: handshake.negotiatedProtocolVersion.major,
                     minor: handshake.negotiatedProtocolVersion.minor
                 ),
-                runtimeCapabilities: runtimeCapabilities
-                    .map(\.rawValue)
-                    .sorted(),
+                runtimeCapabilities: runtimeCapabilities.map(\.rawValue).sorted(),
                 missingRuntimeCapabilities: missingCapabilities,
-                recoverySuggestion: recoverySuggestion
+                recoverySuggestion: suggestion(
+                    status: status,
+                    runtimeVersion: handshake.runtime.version,
+                    missingCapabilities: missingCapabilities
+                )
             ),
             supportedProviderCapabilities: supportedProviderCapabilities(
                 runtimeCapabilities: runtimeCapabilities,
@@ -102,28 +96,25 @@ struct AstrolabeRuntimeCompatibilityPolicy {
         )
     }
 
-    func require(
+    package func require(
         _ capability: RuntimeUICapability,
         compatibility: AstrolabeRuntimeCompatibility
     ) throws {
         guard let requirements = requirementsByProviderCapability[capability] else {
             throw AstrolabeRuntimeClientError.invalidResponse(
-                "The iOS Runtime Provider does not define compatibility requirements for \(capability.rawValue)"
+                "The \(platform.rawValue) Runtime Provider does not define compatibility requirements for \(capability.rawValue)"
             )
         }
-        try requireRuntimeCapabilities(
-            requirements,
-            compatibility: compatibility
-        )
+        try requireRuntimeCapabilities(requirements, compatibility: compatibility)
     }
 
-    func requireRuntimeCapabilities(
+    package func requireRuntimeCapabilities(
         _ requirements: Set<RuntimeCapability>,
         compatibility: AstrolabeRuntimeCompatibility
     ) throws {
         guard compatibility.isExpectedPlatform else {
             throw AstrolabeRuntimeClientError.invalidResponse(
-                "The target Runtime platform is not iOS"
+                "The target Runtime platform is not \(platform.rawValue)"
             )
         }
         let missingCapabilities = requirements
@@ -133,7 +124,8 @@ struct AstrolabeRuntimeCompatibilityPolicy {
         guard missingCapabilities.isEmpty else {
             throw AstrolabeRuntimeClientError.updateRequired(
                 runtimeVersion: compatibility.record.runtimeVersion,
-                missingCapabilities: missingCapabilities
+                missingCapabilities: missingCapabilities,
+                runtimePackageName: runtimePackageName
             )
         }
     }
@@ -161,10 +153,21 @@ struct AstrolabeRuntimeCompatibilityPolicy {
         case .updateRequired:
             return AstrolabeRuntimeCompatibilityMessage.updateSuggestion(
                 runtimeVersion: runtimeVersion,
-                missingCapabilities: missingCapabilities
+                missingCapabilities: missingCapabilities,
+                runtimePackageName: runtimePackageName
             )
         case .incompatible:
-            return "The current Runtime platform is incompatible with the iOS Provider; ensure the app integrates astrolabe-runtime-ios"
+            return "The current Runtime platform is incompatible with the \(platform.rawValue) Provider; ensure the app integrates \(runtimePackageName)"
         }
+    }
+}
+
+package enum AstrolabeRuntimeCompatibilityMessage {
+    package static func updateSuggestion(
+        runtimeVersion: String,
+        missingCapabilities: [String],
+        runtimePackageName: String
+    ) -> String {
+        "Astrolabe Runtime \(runtimeVersion) is missing capabilities: \(missingCapabilities.joined(separator: ", ")). Update \(runtimePackageName), then rebuild and launch the app"
     }
 }

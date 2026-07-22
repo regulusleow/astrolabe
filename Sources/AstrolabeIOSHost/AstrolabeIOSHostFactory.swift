@@ -11,8 +11,12 @@ import AstrolabeIOSScreenshot
 
 package enum AstrolabeIOSHostFactory {
     package static func makeCommandRunner() throws -> CLICommandRunner {
+        try CLICommandRunner(platformModules: [makePlatformModule()])
+    }
+
+    package static func makePlatformModule() throws -> HostPlatformModule {
         let provider = AstrolabeIOSRuntimeProvider()
-        let module = try HostPlatformModuleBuilder(provider: provider)
+        return try HostPlatformModuleBuilder(provider: provider)
             .applicationDiscovery(provider)
             .appDiscoveryDiagnostics(provider)
             .hierarchyCapture(provider)
@@ -30,6 +34,5 @@ package enum AstrolabeIOSHostFactory {
             .visualDiffIssueInterpreter(UIKitVisualDiffIssueInterpreter())
             .namedMaskResolver(IOSSystemScreenshotNamedMaskResolver())
             .build()
-        return try CLICommandRunner(platformModules: [module])
     }
 }

@@ -165,13 +165,21 @@ test("MCP inspector runner times out hung CLI subprocesses", async () => {
 test("Swift CLI keeps entrypoint, command routing, Runtime UI Provider, and JSON output separated", async () => {
   const mainSource = await readProjectFile("Sources/AstrolabeExecutable/main.swift");
   const runnerSource = await readProjectFile("Sources/AstrolabeCLI/CommandLine/CLICommandRunner.swift");
-  const hostFactorySource = await readProjectFile("Sources/AstrolabeIOSHost/AstrolabeIOSHostFactory.swift");
-  const serviceSource = await readProjectFile("Sources/AstrolabeIOSHost/AstrolabeIOSRuntimeProvider.swift");
+  const hostFactorySource = await readProjectFiles([
+    "Sources/AstrolabeIOSHost/AstrolabeIOSHostFactory.swift",
+    "Sources/AstrolabeAndroidPlatform/AstrolabeAndroidHostFactory.swift"
+  ]);
+  const serviceSource = await readProjectFiles([
+    "Sources/AstrolabeIOSHost/AstrolabeIOSRuntimeProvider.swift",
+    "Sources/AstrolabeAndroidHost/AstrolabeAndroidRuntimeProvider.swift"
+  ]);
   const moduleSource = await readProjectFile("Sources/AstrolabeCLI/Runtime/Core/HostPlatformModule.swift");
   const registrySource = await readProjectFile("Sources/AstrolabeCLI/Runtime/Core/HostPlatformModuleRegistry.swift");
   const outputSource = await readProjectFile("Sources/AstrolabeCLI/CommandLine/JSONOutput.swift");
 
-  assert.match(mainSource, /AstrolabeIOSHostFactory\.makeCommandRunner/);
+  assert.match(mainSource, /CLICommandRunner\(platformModules:/);
+  assert.match(mainSource, /AstrolabeIOSHostFactory\.makePlatformModule/);
+  assert.match(mainSource, /AstrolabeAndroidHostFactory\.makePlatformModule/);
   assert.doesNotMatch(mainSource, /ASTInspectorClient/);
   assert.doesNotMatch(mainSource, /RunLoop/);
   assert.match(runnerSource, /struct CLICommandRunner/);
@@ -179,6 +187,7 @@ test("Swift CLI keeps entrypoint, command routing, Runtime UI Provider, and JSON
   assert.match(hostFactorySource, /HostPlatformModuleBuilder/);
   assert.match(hostFactorySource, /CLICommandRunner\(platformModules:/);
   assert.match(serviceSource, /final class AstrolabeIOSRuntimeProvider/);
+  assert.match(serviceSource, /final class AstrolabeAndroidRuntimeProvider/);
   assert.match(serviceSource, /RuntimeUIProviderTargeting/);
   assert.match(serviceSource, /RuntimeUIHierarchyCapturing/);
   assert.match(serviceSource, /RuntimeUINodeDetailProviding/);
@@ -228,15 +237,19 @@ test("Swift CLI runner delegates command domains to handlers", async () => {
 test("Swift screenshot provider separates source selection from payload assembly", async () => {
   const providerSource = await readProjectFile("Sources/AstrolabeCLI/Screenshot/Core/ScreenshotProvider.swift");
   const iosProviderSource = await readProjectFile("Sources/AstrolabeIOSScreenshot/IOSSystemScreenshotProvider.swift");
-  const builderSource = await readProjectFile("Sources/AstrolabeIOSScreenshot/ScreenshotPayloadBuilder.swift");
+  const androidProviderSource = await readProjectFile("Sources/AstrolabeAndroidScreenshot/AndroidSystemScreenshotProvider.swift");
+  const builderSource = await readProjectFile("Sources/AstrolabeScreenshotSupport/SystemScreenshotPayloadBuilder.swift");
 
   assert.match(providerSource, /protocol PlatformScreenshotProviding/);
   assert.match(providerSource, /private let platformProviders/);
-  assert.match(iosProviderSource, /ScreenshotPayloadBuilding/);
+  assert.match(iosProviderSource, /SystemScreenshotPayloadBuilding/);
   assert.match(iosProviderSource, /payloadBuilder/);
   assert.match(iosProviderSource, /struct IOSSystemScreenshotProvider/);
-  assert.match(builderSource, /struct ScreenshotPayloadBuilder/);
+  assert.match(androidProviderSource, /SystemScreenshotPayloadBuilding/);
+  assert.match(androidProviderSource, /payloadBuilder/);
+  assert.match(builderSource, /struct SystemScreenshotPayloadBuilder/);
   assert.doesNotMatch(iosProviderSource, /"base64": pngData\.base64EncodedString\(\)/);
+  assert.doesNotMatch(androidProviderSource, /"base64": pngData\.base64EncodedString\(\)/);
 });
 
 test("Swift node queries delegate semantic role classification", async () => {
@@ -280,11 +293,17 @@ test("maintained Swift files use the standard file header", async () => {
   }
 });
 
-test("production Host registers only the Astrolabe Runtime provider", async () => {
-  const hostFactorySource = await readProjectFile("Sources/AstrolabeIOSHost/AstrolabeIOSHostFactory.swift");
+test("production Host registers only Astrolabe Runtime platform providers", async () => {
+  const mainSource = await readProjectFile("Sources/AstrolabeExecutable/main.swift");
+  const hostFactorySource = await readProjectFiles([
+    "Sources/AstrolabeIOSHost/AstrolabeIOSHostFactory.swift",
+    "Sources/AstrolabeAndroidPlatform/AstrolabeAndroidHostFactory.swift"
+  ]);
 
   assert.match(hostFactorySource, /let provider = AstrolabeIOSRuntimeProvider\(\)/);
-  assert.match(hostFactorySource, /CLICommandRunner\(platformModules: \[module\]\)/);
+  assert.match(hostFactorySource, /let provider = AstrolabeAndroidRuntimeProvider\(\)/);
+  assert.match(mainSource, /AstrolabeIOSHostFactory\.makePlatformModule/);
+  assert.match(mainSource, /AstrolabeAndroidHostFactory\.makePlatformModule/);
   assert.doesNotMatch(hostFactorySource, /IOSRuntimeUIProvider/);
   assert.doesNotMatch(hostFactorySource, /RuntimeDiagnosticCommandGroup/);
 });

@@ -7,6 +7,7 @@
 
 import AstrolabeCLI
 import AstrolabeProtocol
+import AstrolabeRuntimeHostCore
 import Foundation
 
 package final class AstrolabeIOSRuntimeProvider:
@@ -39,17 +40,21 @@ package final class AstrolabeIOSRuntimeProvider:
 
     init(
         endpointDiscovery: any AstrolabeRuntimeEndpointDiscovering =
-            CompositeAstrolabeRuntimeEndpointDiscovery(
-                discoveries: [
-                    SimulatorAstrolabeRuntimeEndpointDiscovery(),
-                    USBMuxAstrolabeRuntimeEndpointDiscovery()
-                ]
-            ),
+            CompositeAstrolabeRuntimeEndpointDiscovery(discoveries: [
+                SimulatorAstrolabeRuntimeEndpointDiscovery(),
+                USBMuxAstrolabeRuntimeEndpointDiscovery()
+            ]),
         clientFactory: any AstrolabeRuntimeClientCreating =
-            AstrolabeRuntimeProtocolClientFactory(),
+            AstrolabeRuntimeProtocolClientFactory(
+                transportFactory: DefaultAstrolabeRuntimeTransportFactory(),
+                runtimePackageName: "astrolabe-runtime-ios"
+            ),
         mapper: AstrolabeRuntimeResponseMapper = AstrolabeRuntimeResponseMapper(),
         compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy =
-            AstrolabeRuntimeCompatibilityPolicy()
+            AstrolabeRuntimeCompatibilityPolicy(
+                platform: .ios,
+                runtimePackageName: "astrolabe-runtime-ios"
+            )
     ) {
         self.endpointDiscovery = endpointDiscovery
         self.clientFactory = clientFactory
@@ -65,8 +70,7 @@ package final class AstrolabeIOSRuntimeProvider:
         guard let appID = try? AstrolabeRuntimeAppID(rawValue: appId) else {
             return false
         }
-        return appID.connectionKind == "simulator" ||
-            appID.connectionKind == "usb"
+        return appID.connectionKind == "simulator" || appID.connectionKind == "usb"
     }
 
     package func fetchApps() throws -> [InspectableAppRecord] {
@@ -113,9 +117,9 @@ package final class AstrolabeIOSRuntimeProvider:
 
     package func fetchHierarchy(appId: String) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        let session = try sessionStore.session(for: appID)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.hierarchy(
-            appID: appID,
+            appID: appID.rawValue,
             handshake: session.handshake,
             appInfo: session.appInfo,
             snapshot: try session.hierarchySnapshot()
@@ -124,10 +128,10 @@ package final class AstrolabeIOSRuntimeProvider:
 
     package func fetchNodeDetail(appId: String, oid: String) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        let session = try sessionStore.session(for: appID)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
         let nodeID = try RuntimeOpaqueIdentifier(rawValue: oid)
         return mapper.nodeDetail(
-            appID: appID,
+            appID: appID.rawValue,
             requestedNodeID: nodeID,
             detail: try session.nodeDetail(nodeID: nodeID)
         )
@@ -140,9 +144,9 @@ package final class AstrolabeIOSRuntimeProvider:
         value: RuntimeAttributeValue
     ) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        let session = try sessionStore.session(for: appID)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.attributePatch(
-            appID: appID,
+            appID: appID.rawValue,
             patch: try session.applyAttributePatch(
                 nodeID: try RuntimeOpaqueIdentifier(rawValue: oid),
                 attributeIdentifier: try RuntimeAttributeIdentifier(
@@ -157,32 +161,36 @@ package final class AstrolabeIOSRuntimeProvider:
         appId: String
     ) throws -> RuntimePatchableAttributesPayload {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        return try sessionStore.session(for: appID).patchableAttributes()
+        return try sessionStore.session(for: sessionTarget(for: appID))
+            .patchableAttributes()
     }
 
     package func fetchAttributePatches(appId: String) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        let session = try sessionStore.session(for: appID)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.attributePatchList(
-            appID: appID,
+            appID: appID.rawValue,
             list: try session.attributePatches()
         )
     }
 
-    package func revertAttributePatch(appId: String, patchID: String) throws -> [String: Any] {
+    package func revertAttributePatch(
+        appId: String,
+        patchID: String
+    ) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        let session = try sessionStore.session(for: appID)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.attributePatchRevert(
-            appID: appID,
+            appID: appID.rawValue,
             response: try session.revertAttributePatch(patchID: patchID)
         )
     }
 
     package func clearAttributePatches(appId: String) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
-        let session = try sessionStore.session(for: appID)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.attributePatchClear(
-            appID: appID,
+            appID: appID.rawValue,
             response: try session.clearAttributePatches()
         )
     }
@@ -194,22 +202,18 @@ package final class AstrolabeIOSRuntimeProvider:
             let client = try clientFactory.makeClient(endpoint: endpoint)
             defer { client.close() }
             let handshake = try client.handshake()
-            let compatibility = compatibilityPolicy.evaluate(
-                handshake: handshake
-            )
+            let compatibility = compatibilityPolicy.evaluate(handshake: handshake)
             let appInfo: RuntimeApplicationInfoPayload?
             if compatibility.isExpectedPlatform,
                compatibility.runtimeCapabilities.contains(.applicationInfo) {
                 let value = try client.appInfo()
                 guard value.target.identifier == handshake.runtime.instanceID else {
-                    return .diagnostic(
-                        diagnostic(
-                            endpoint: endpoint,
-                            error: .invalidResponse(
-                                "App information does not match the handshake process identifier"
-                            )
+                    return .diagnostic(diagnostic(
+                        endpoint: endpoint,
+                        error: .invalidResponse(
+                            "App information does not match the handshake process identifier"
                         )
-                    )
+                    ))
                 }
                 appInfo = value
             } else {
@@ -241,17 +245,25 @@ package final class AstrolabeIOSRuntimeProvider:
             case .connectionFailed, .connectionClosed:
                 return .unavailable
             case let .timeout(operation)
-                where operation == "Connect to Astrolabe iOS Runtime":
+                where operation == "Connect to Astrolabe Runtime":
                 return .unavailable
-            case .timeout, .invalidResponse, .protocolVersionMismatch, .updateRequired, .remote,
-                 .invalidAppID, .staleApp:
-                return .diagnostic(
-                    diagnostic(endpoint: endpoint, error: error)
-                )
+            case .timeout, .invalidResponse, .protocolVersionMismatch,
+                 .updateRequired, .remote, .invalidAppID, .staleApp:
+                return .diagnostic(diagnostic(endpoint: endpoint, error: error))
             }
         } catch {
             return .unavailable
         }
+    }
+
+    private func sessionTarget(
+        for appID: AstrolabeRuntimeAppID
+    ) -> AstrolabeRuntimeSessionTarget {
+        AstrolabeRuntimeSessionTarget(
+            appID: appID.rawValue,
+            runtimeInstanceIdentifier: appID.runtimeInstanceIdentifier,
+            endpoint: appID.endpoint
+        )
     }
 
     private func diagnostic(
@@ -290,181 +302,4 @@ private enum AstrolabeRuntimeDiscoveryResult {
     case app(InspectableAppRecord)
     case diagnostic(RuntimeAppDiscoveryDiagnostic)
     case unavailable
-}
-
-private final class AstrolabeRuntimeSessionStore {
-    private let clientFactory: any AstrolabeRuntimeClientCreating
-    private let compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
-    private let lock = NSLock()
-    private var sessions = [AstrolabeRuntimeAppID: AstrolabeRuntimeClientSession]()
-
-    init(
-        clientFactory: any AstrolabeRuntimeClientCreating,
-        compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
-    ) {
-        self.clientFactory = clientFactory
-        self.compatibilityPolicy = compatibilityPolicy
-    }
-
-    deinit {
-        lock.lock()
-        let sessions = Array(sessions.values)
-        self.sessions.removeAll()
-        lock.unlock()
-        sessions.forEach { $0.close() }
-    }
-
-    func session(
-        for appID: AstrolabeRuntimeAppID
-    ) throws -> AstrolabeRuntimeClientSession {
-        lock.lock()
-        if let session = sessions[appID] {
-            lock.unlock()
-            return session
-        }
-        lock.unlock()
-
-        let newSession = try AstrolabeRuntimeClientSession(
-            appID: appID,
-            client: try clientFactory.makeClient(endpoint: appID.endpoint),
-            compatibilityPolicy: compatibilityPolicy
-        )
-        lock.lock()
-        if let existingSession = sessions[appID] {
-            lock.unlock()
-            newSession.close()
-            return existingSession
-        }
-        sessions[appID] = newSession
-        lock.unlock()
-        return newSession
-    }
-}
-
-private final class AstrolabeRuntimeClientSession {
-    /// Runtime information returned after the current connection completes its handshake.
-    let handshake: RuntimeHandshakePayload
-
-    /// App and device information associated with the current connection.
-    let appInfo: RuntimeApplicationInfoPayload
-
-    private let client: any AstrolabeRuntimeClient
-    private let compatibility: AstrolabeRuntimeCompatibility
-    private let compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
-    private var didCaptureHierarchy = false
-
-    init(
-        appID: AstrolabeRuntimeAppID,
-        client: any AstrolabeRuntimeClient,
-        compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
-    ) throws {
-        self.client = client
-        self.compatibilityPolicy = compatibilityPolicy
-        do {
-            handshake = try client.handshake()
-            compatibility = compatibilityPolicy.evaluate(handshake: handshake)
-            try compatibilityPolicy.requireRuntimeCapabilities(
-                [.applicationInfo],
-                compatibility: compatibility
-            )
-            guard handshake.runtime.instanceID.rawValue == appID.runtimeInstanceIdentifier else {
-                throw AstrolabeRuntimeClientError.staleApp(
-                    runtimeInstanceIdentifier: handshake.runtime.instanceID.rawValue
-                )
-            }
-            appInfo = try client.appInfo()
-            guard appInfo.target.identifier == handshake.runtime.instanceID else {
-                throw AstrolabeRuntimeClientError.invalidResponse(
-                    "App information does not match the process returned by the handshake"
-                )
-            }
-        } catch {
-            client.close()
-            throw error
-        }
-    }
-
-    func hierarchySnapshot() throws -> RuntimeHierarchySnapshotPayload {
-        try compatibilityPolicy.require(
-            .hierarchy,
-            compatibility: compatibility
-        )
-        let snapshot = try client.hierarchySnapshot()
-        didCaptureHierarchy = true
-        return snapshot
-    }
-
-    func nodeDetail(nodeID: RuntimeOpaqueIdentifier) throws -> RuntimeNodeDetailPayload {
-        try compatibilityPolicy.require(
-            .nodeDetail,
-            compatibility: compatibility
-        )
-        if !didCaptureHierarchy {
-            _ = try hierarchySnapshot()
-        }
-        return try client.nodeDetail(nodeID: nodeID)
-    }
-
-    func applyAttributePatch(
-        nodeID: RuntimeOpaqueIdentifier,
-        attributeIdentifier: RuntimeAttributeIdentifier,
-        value: RuntimeAttributeValue
-    ) throws -> RuntimeAttributePatch {
-        try compatibilityPolicy.require(
-            .attributePatching,
-            compatibility: compatibility
-        )
-        if !didCaptureHierarchy {
-            _ = try hierarchySnapshot()
-        }
-        return try client.applyAttributePatch(
-            RuntimeApplyAttributePatchParameters(
-                nodeID: nodeID,
-                attributeIdentifier: attributeIdentifier,
-                value: value
-            )
-        )
-    }
-
-    func patchableAttributes() throws -> RuntimePatchableAttributesPayload {
-        try compatibilityPolicy.require(
-            .attributePatchDiscovery,
-            compatibility: compatibility
-        )
-        return try client.patchableAttributes()
-    }
-
-    func attributePatches() throws -> RuntimeAttributePatchListPayload {
-        try compatibilityPolicy.require(
-            .attributePatching,
-            compatibility: compatibility
-        )
-        return try client.attributePatches()
-    }
-
-    func revertAttributePatch(
-        patchID: String
-    ) throws -> RuntimeRevertAttributePatchPayload {
-        try compatibilityPolicy.require(
-            .attributePatching,
-            compatibility: compatibility
-        )
-        return try client.revertAttributePatch(
-            RuntimeRevertAttributePatchParameters(
-                patchID: try RuntimeOpaqueIdentifier(rawValue: patchID)
-            )
-        )
-    }
-
-    func clearAttributePatches() throws -> RuntimeClearAttributePatchesPayload {
-        try compatibilityPolicy.require(
-            .attributePatching,
-            compatibility: compatibility
-        )
-        return try client.clearAttributePatches()
-    }
-
-    func close() {
-        client.close()
-    }
 }

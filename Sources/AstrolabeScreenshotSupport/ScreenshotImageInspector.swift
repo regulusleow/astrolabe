@@ -2,46 +2,59 @@
 //  ScreenshotImageInspector.swift
 //  astrolabe
 //
-//  Created by 轩辕十四 on 2026/7/3.
+//  Created by 轩辕十四 on 2026/7/22.
 //
 
 import AstrolabeCLI
+import CoreGraphics
 import Foundation
 import ImageIO
-import CoreGraphics
 
-struct ScreenshotImageMetadata {
+package struct ScreenshotImageMetadata {
     /// PNG pixel width.
-    let pixelWidth: Int
+    package let pixelWidth: Int
 
     /// PNG pixel height.
-    let pixelHeight: Int
+    package let pixelHeight: Int
+
+    package init(pixelWidth: Int, pixelHeight: Int) {
+        self.pixelWidth = pixelWidth
+        self.pixelHeight = pixelHeight
+    }
 }
 
-protocol ScreenshotImageMetadataReading {
+package protocol ScreenshotImageMetadataReading {
     func metadata(from data: Data) throws -> ScreenshotImageMetadata
 }
 
-struct ScreenshotImageMetadataReader: ScreenshotImageMetadataReading {
-    func metadata(from data: Data) throws -> ScreenshotImageMetadata {
+package struct ScreenshotImageMetadataReader: ScreenshotImageMetadataReading {
+    package init() {}
+
+    package func metadata(from data: Data) throws -> ScreenshotImageMetadata {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let properties = CGImageSourceCopyPropertiesAtIndex(
+                source,
+                0,
+                nil
+              ) as? [CFString: Any],
               let width = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.intValue,
               let height = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.intValue,
               width > 0,
               height > 0 else {
-            throw CLIError.invalidJSONObject
+            throw CLIError.invalidScreenshot("Unable to decode PNG metadata")
         }
         return ScreenshotImageMetadata(pixelWidth: width, pixelHeight: height)
     }
 }
 
-protocol ScreenshotImageContentInspecting {
+package protocol ScreenshotImageContentInspecting {
     func isCompletelyBlack(_ data: Data) throws -> Bool
 }
 
-struct ScreenshotImageContentInspector: ScreenshotImageContentInspecting {
-    func isCompletelyBlack(_ data: Data) throws -> Bool {
+package struct ScreenshotImageContentInspector: ScreenshotImageContentInspecting {
+    package init() {}
+
+    package func isCompletelyBlack(_ data: Data) throws -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil),
               let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
             throw CLIError.invalidScreenshot("Unable to decode PNG data")
@@ -76,9 +89,9 @@ struct ScreenshotImageContentInspector: ScreenshotImageContentInspecting {
         }
         return stride(from: 0, to: pixels.count, by: bytesPerPixel)
             .allSatisfy { offset in
-                pixels[offset] == 0 &&
-                    pixels[offset + 1] == 0 &&
-                    pixels[offset + 2] == 0
+                pixels[offset] == 0
+                    && pixels[offset + 1] == 0
+                    && pixels[offset + 2] == 0
             }
     }
 }

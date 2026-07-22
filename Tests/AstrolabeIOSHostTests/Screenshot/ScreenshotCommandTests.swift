@@ -14,6 +14,7 @@ import UniformTypeIdentifiers
 @testable import AstrolabeIOSDeviceSupport
 @testable import AstrolabeIOSHost
 @testable import AstrolabeIOSScreenshot
+@testable import AstrolabeScreenshotSupport
 
 private typealias Fixtures = CLICommandTestFixtures
 
@@ -365,7 +366,7 @@ final class ScreenshotCommandTests: XCTestCase {
             deviceIdentifierResolver: Fixtures.FakeDeviceIdentifierResolver(deviceIdentifier: "DEVICE-UDID"),
             deviceLockStateReader: Fixtures.FakeDeviceLockStateReader(states: [Fixtures.unlockedDeviceState]),
             imageContentInspector: Fixtures.FakeScreenshotImageContentInspector(isBlack: false),
-            payloadBuilder: ScreenshotPayloadBuilder(
+            payloadBuilder: SystemScreenshotPayloadBuilder(
                 imageMetadataReader: Fixtures.FakeScreenshotImageMetadataReader(pixelWidth: 1170, pixelHeight: 2532)
             )
         )
@@ -407,7 +408,9 @@ final class ScreenshotCommandTests: XCTestCase {
             deviceIdentifierResolver: Fixtures.FakeDeviceIdentifierResolver(deviceIdentifier: nil),
             deviceLockStateReader: Fixtures.FakeDeviceLockStateReader(states: []),
             imageContentInspector: Fixtures.FakeScreenshotImageContentInspector(isBlack: false),
-            payloadBuilder: ScreenshotPayloadBuilder(imageMetadataReader: ScreenshotImageMetadataReader())
+            payloadBuilder: SystemScreenshotPayloadBuilder(
+                imageMetadataReader: ScreenshotImageMetadataReader()
+            )
         )
         let platformResolver = Fixtures.FakeInspectorService()
         let provider = DefaultScreenshotProvider(

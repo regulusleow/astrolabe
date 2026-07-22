@@ -10,6 +10,22 @@ import AstrolabeCLI
 import XCTest
 
 final class AndroidInspectionStrategyTests: XCTestCase {
+    func testVisualDiffInterpreterPrioritizesAndroidTypographyChanges() {
+        let interpreter = AndroidVisualDiffIssueInterpreter()
+        let interpretation = interpreter.interpretation(
+            for: [
+                "className": "android.widget.TextView",
+                "baselineDetailChanges": [["field": "android.text.fontSize"]]
+            ],
+            suspectedIssues: ["fontSizeChanged", "layoutMismatchCandidate"],
+            appId: "android:device:1:app:instance"
+        )
+
+        XCTAssertEqual(interpretation.dominantCategory, "typography")
+        XCTAssertEqual(interpretation.issueCategories, ["typography", "layout"])
+        XCTAssertTrue(interpretation.reviewHint.contains("typography"))
+    }
+
     func testRoleClassifierRecognizesAndroidSemanticControls() {
         let classifier = AndroidNodeSemanticRoleClassifier()
 

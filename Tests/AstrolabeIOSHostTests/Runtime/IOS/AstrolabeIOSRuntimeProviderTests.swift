@@ -8,6 +8,7 @@
 @testable import AstrolabeCLI
 @testable import AstrolabeIOSDeviceSupport
 @testable import AstrolabeIOSHost
+@testable import AstrolabeRuntimeHostCore
 import AstrolabeProtocol
 import Foundation
 import XCTest
@@ -545,7 +546,10 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
             handshake: try makeHandshake(),
             appInfo: try makeAppInfo()
         )
-        let client = AstrolabeRuntimeProtocolClient(transport: transport)
+        let client = AstrolabeRuntimeProtocolClient(
+            transport: transport,
+            runtimePackageName: "astrolabe-runtime-ios"
+        )
 
         let handshake = try client.handshake()
         let appInfo = try client.appInfo()
@@ -562,18 +566,27 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
             appInfo: try makeAppInfo(),
             responseProtocolVersion: RuntimeProtocolVersion(major: 1, minor: 0)
         )
-        let client = AstrolabeRuntimeProtocolClient(transport: transport)
+        let client = AstrolabeRuntimeProtocolClient(
+            transport: transport,
+            runtimePackageName: "astrolabe-runtime-ios"
+        )
 
         XCTAssertThrowsError(try client.handshake()) { error in
-            guard case let AstrolabeRuntimeClientError.protocolVersionMismatch(host, runtime) = error else {
+            guard case let AstrolabeRuntimeClientError.protocolVersionMismatch(
+                host,
+                runtime,
+                runtimePackageName
+            ) = error else {
                 return XCTFail("Expected a protocol version mismatch error, got \(error)")
             }
             XCTAssertEqual(host, .v2)
             XCTAssertEqual(runtime, RuntimeProtocolVersion(major: 1, minor: 0))
+            XCTAssertEqual(runtimePackageName, "astrolabe-runtime-ios")
             XCTAssertEqual(
                 AstrolabeRuntimeClientError.protocolVersionMismatch(
                     host: host,
-                    runtime: runtime
+                    runtime: runtime,
+                    runtimePackageName: runtimePackageName
                 ).errorRecoverySuggestion,
                 "Update astrolabe-runtime-ios, then rebuild and launch the app"
             )
@@ -586,7 +599,10 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
             appInfo: try makeAppInfo(),
             responseMethod: .applicationInfo
         )
-        let client = AstrolabeRuntimeProtocolClient(transport: transport)
+        let client = AstrolabeRuntimeProtocolClient(
+            transport: transport,
+            runtimePackageName: "astrolabe-runtime-ios"
+        )
 
         XCTAssertThrowsError(try client.handshake()) { error in
             guard case let AstrolabeRuntimeClientError.invalidResponse(message) = error else {
@@ -623,7 +639,7 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         )
 
         let mapped = AstrolabeRuntimeResponseMapper().nodeDetail(
-            appID: appID,
+            appID: appID.rawValue,
             requestedNodeID: try RuntimeOpaqueIdentifier(rawValue: "node-1"),
             detail: detail
         )

@@ -2,28 +2,30 @@
 //  AstrolabeRuntimeTransport.swift
 //  astrolabe
 //
-//  Created by 轩辕十四 on 2026/7/11.
+//  Created by 轩辕十四 on 2026/7/22.
 //
 
-import AstrolabeCLI
 import Foundation
 import Network
 
-protocol AstrolabeRuntimeTransport: AnyObject {
+package protocol AstrolabeRuntimeTransport: AnyObject {
     func connect() throws
     func send(_ data: Data) throws
     func receive(byteCount: Int) throws -> Data
     func close()
 }
 
-protocol AstrolabeRuntimeTransportCreating {
+package protocol AstrolabeRuntimeTransportCreating {
     func makeTransport(
         endpoint: AstrolabeRuntimeEndpoint
     ) throws -> any AstrolabeRuntimeTransport
 }
 
-struct TCPAstrolabeRuntimeTransportFactory: AstrolabeRuntimeTransportCreating {
-    func makeTransport(
+package struct TCPAstrolabeRuntimeTransportFactory:
+    AstrolabeRuntimeTransportCreating {
+    package init() {}
+
+    package func makeTransport(
         endpoint: AstrolabeRuntimeEndpoint
     ) throws -> any AstrolabeRuntimeTransport {
         try TCPAstrolabeRuntimeTransport(endpoint: endpoint)
@@ -52,9 +54,7 @@ private final class TCPAstrolabeRuntimeTransport: AstrolabeRuntimeTransport {
             port: port,
             using: .tcp
         )
-        queue = DispatchQueue(
-            label: "com.astrolabe.runtime-host.\(endpoint.port)"
-        )
+        queue = DispatchQueue(label: "com.astrolabe.runtime-host.\(endpoint.port)")
         self.connectTimeout = connectTimeout
         self.requestTimeout = requestTimeout
     }
@@ -69,13 +69,9 @@ private final class TCPAstrolabeRuntimeTransport: AstrolabeRuntimeTransport {
             case .ready:
                 waiter.resolve(.success(()))
             case let .failed(error):
-                waiter.resolve(
-                    .failure(
-                        AstrolabeRuntimeClientError.connectionFailed(
-                            String(describing: error)
-                        )
-                    )
-                )
+                waiter.resolve(.failure(AstrolabeRuntimeClientError.connectionFailed(
+                    String(describing: error)
+                )))
             case .cancelled:
                 waiter.resolve(.failure(AstrolabeRuntimeClientError.connectionClosed))
             default:
@@ -85,7 +81,7 @@ private final class TCPAstrolabeRuntimeTransport: AstrolabeRuntimeTransport {
         connection.start(queue: queue)
         try waiter.wait(
             timeout: connectTimeout,
-            operation: "Connect to Astrolabe iOS Runtime"
+            operation: "Connect to Astrolabe Runtime"
         )
         didConnect = true
     }
@@ -97,13 +93,9 @@ private final class TCPAstrolabeRuntimeTransport: AstrolabeRuntimeTransport {
         let waiter = AstrolabeRuntimeOperationWaiter<Void>()
         connection.send(content: data, completion: .contentProcessed { error in
             if let error {
-                waiter.resolve(
-                    .failure(
-                        AstrolabeRuntimeClientError.connectionFailed(
-                            String(describing: error)
-                        )
-                    )
-                )
+                waiter.resolve(.failure(AstrolabeRuntimeClientError.connectionFailed(
+                    String(describing: error)
+                )))
             } else {
                 waiter.resolve(.success(()))
             }
@@ -123,45 +115,31 @@ private final class TCPAstrolabeRuntimeTransport: AstrolabeRuntimeTransport {
                 "Response read length cannot be negative"
             )
         }
-
         var result = Data()
         while result.count < byteCount {
-            let remainingCount = byteCount - result.count
             let waiter = AstrolabeRuntimeOperationWaiter<Data>()
             connection.receive(
                 minimumIncompleteLength: 1,
-                maximumLength: remainingCount
+                maximumLength: byteCount - result.count
             ) { data, _, isComplete, error in
                 if let error {
-                    waiter.resolve(
-                        .failure(
-                            AstrolabeRuntimeClientError.connectionFailed(
-                                String(describing: error)
-                            )
-                        )
-                    )
+                    waiter.resolve(.failure(AstrolabeRuntimeClientError.connectionFailed(
+                        String(describing: error)
+                    )))
                 } else if let data, !data.isEmpty {
                     waiter.resolve(.success(data))
                 } else if isComplete {
-                    waiter.resolve(
-                        .failure(AstrolabeRuntimeClientError.connectionClosed)
-                    )
+                    waiter.resolve(.failure(AstrolabeRuntimeClientError.connectionClosed))
                 } else {
-                    waiter.resolve(
-                        .failure(
-                            AstrolabeRuntimeClientError.invalidResponse(
-                                "The Runtime returned an empty data block"
-                            )
-                        )
-                    )
+                    waiter.resolve(.failure(AstrolabeRuntimeClientError.invalidResponse(
+                        "The Runtime returned an empty data block"
+                    )))
                 }
             }
-            result.append(
-                try waiter.wait(
-                    timeout: requestTimeout,
-                    operation: "Read an Astrolabe Runtime response"
-                )
-            )
+            result.append(try waiter.wait(
+                timeout: requestTimeout,
+                operation: "Read an Astrolabe Runtime response"
+            ))
         }
         return result
     }

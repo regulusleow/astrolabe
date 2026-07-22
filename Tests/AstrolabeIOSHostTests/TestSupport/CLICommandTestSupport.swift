@@ -16,6 +16,7 @@ import XCTest
 @testable import AstrolabeIOSHost
 @testable import AstrolabeIOSInspection
 @testable import AstrolabeIOSScreenshot
+@testable import AstrolabeScreenshotSupport
 
 enum CLICommandTestFixtures {
     final class FakeInspectorService:
@@ -368,7 +369,7 @@ enum CLICommandTestFixtures {
             imageContentInspector: FakeScreenshotImageContentInspector(
                 isBlack: isBlack
             ),
-            payloadBuilder: ScreenshotPayloadBuilder(
+            payloadBuilder: SystemScreenshotPayloadBuilder(
                 imageMetadataReader: FakeScreenshotImageMetadataReader(
                     pixelWidth: 1170,
                     pixelHeight: 2532

@@ -180,6 +180,99 @@ final class AstrolabeAndroidRuntimeProviderTests: XCTestCase {
         XCTAssertEqual(apps.map(\.endpointPort), [47_231, 47_232])
     }
 
+    func testProviderDiscoversMultipleRuntimeProcessesOnOneDevice() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("""
+            0: 2 0 10000 1 01 1 @astrolabe_321
+            1: 2 0 10000 1 01 1 @astrolabe_654
+            """),
+            commandOutput("47231\n"),
+            commandOutput("47232\n")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-first"),
+                    appInfo: try makeAppInfo(
+                        processIdentifier: "321",
+                        instanceIdentifier: "runtime-first",
+                        applicationIdentifier: "com.example.first"
+                    )
+                ),
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-second"),
+                    appInfo: try makeAppInfo(
+                        processIdentifier: "654",
+                        instanceIdentifier: "runtime-second",
+                        applicationIdentifier: "com.example.second"
+                    )
+                )
+            ])
+        )
+
+        let apps = try provider.fetchApps()
+
+        XCTAssertEqual(apps.map(\.applicationIdentifier), [
+            "com.example.first",
+            "com.example.second"
+        ])
+        XCTAssertEqual(apps.map(\.processIdentifier), ["321", "654"])
+        XCTAssertEqual(Set(apps.map(\.deviceId)), ["emulator-5554"])
+    }
+
+    func testProviderKeepsHealthyRuntimeWhenAnotherProcessFailsValidation() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("""
+            0: 2 0 10000 1 01 1 @astrolabe_321
+            1: 2 0 10000 1 01 1 @astrolabe_654
+            """),
+            commandOutput("47231\n"),
+            commandOutput(""),
+            commandOutput("47232\n")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-invalid"),
+                    appInfo: try makeAppInfo(
+                        processIdentifier: "999",
+                        instanceIdentifier: "runtime-invalid",
+                        applicationIdentifier: "com.example.invalid"
+                    )
+                ),
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-healthy"),
+                    appInfo: try makeAppInfo(
+                        processIdentifier: "654",
+                        instanceIdentifier: "runtime-healthy",
+                        applicationIdentifier: "com.example.healthy"
+                    )
+                )
+            ])
+        )
+
+        let apps = try provider.fetchApps()
+
+        XCTAssertEqual(apps.map(\.applicationIdentifier), ["com.example.healthy"])
+        XCTAssertEqual(
+            provider.appDiscoveryDiagnostics().map(\.errorCode),
+            ["astrolabe_runtime_invalid_response"]
+        )
+        XCTAssertTrue(runner.invocations.contains([
+            "-s", "emulator-5554", "forward", "--remove", "tcp:47231"
+        ]))
+    }
+
     func testProviderReplacesRestartedRuntimeAndClosesPreviousForward() throws {
         let runner = RecordingADBCommandRunner(results: [
             commandOutput("""

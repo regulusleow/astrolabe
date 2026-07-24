@@ -16,6 +16,7 @@ let runner = try CLICommandRunner(platformModules: [
     AstrolabeAndroidHostFactory.makePlatformModule()
 ])
 let exitCode = runner.runAndPrint(arguments: arguments)
+runner.close()
 if exitCode != 0 {
     exit(exitCode)
 }

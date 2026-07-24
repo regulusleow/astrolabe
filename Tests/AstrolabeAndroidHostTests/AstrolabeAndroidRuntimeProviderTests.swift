@@ -374,6 +374,41 @@ final class AstrolabeAndroidRuntimeProviderTests: XCTestCase {
         )
     }
 
+    func testProviderCloseRemovesOwnedForwardExactlyOnce() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("0: 2 0 10000 1 01 1 @astrolabe_321\n"),
+            commandOutput("47231\n"),
+            commandOutput("")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(),
+                    appInfo: try makeAppInfo()
+                )
+            ])
+        )
+
+        XCTAssertEqual(try provider.fetchApps().count, 1)
+
+        provider.close()
+        provider.close()
+
+        XCTAssertEqual(
+            runner.invocations.filter {
+                $0 == [
+                    "-s", "emulator-5554", "forward", "--remove", "tcp:47231"
+                ]
+            }.count,
+            1
+        )
+    }
+
     private func commandOutput(_ value: String) -> ADBCommandResult {
         ADBCommandResult(
             standardOutput: Data(value.utf8),

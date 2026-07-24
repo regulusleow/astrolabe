@@ -59,6 +59,10 @@ package protocol RuntimeUIProviderTargeting {
     func canHandle(appId: String) -> Bool
 }
 
+package protocol RuntimeUIProviderLifecycle {
+    func close()
+}
+
 package protocol RuntimeApplicationDiscovering {
     func fetchApps() throws -> [InspectableAppRecord]
 }

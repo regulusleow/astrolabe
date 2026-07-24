@@ -91,6 +91,10 @@ final class AndroidRuntimeConnectionRegistry {
     }
 
     deinit {
+        close()
+    }
+
+    func close() {
         lock.lock()
         let bindings = Array(bindingsByProcess.values)
         bindingsByProcess.removeAll()

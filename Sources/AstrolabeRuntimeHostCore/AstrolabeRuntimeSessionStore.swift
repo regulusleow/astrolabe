@@ -24,6 +24,10 @@ package final class AstrolabeRuntimeSessionStore {
     }
 
     deinit {
+        close()
+    }
+
+    package func close() {
         lock.lock()
         let sessions = Array(sessions.values)
         self.sessions.removeAll()

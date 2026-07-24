@@ -18,7 +18,8 @@ package final class AstrolabeAndroidRuntimeProvider:
     RuntimeUINodeDetailProviding,
     RuntimeUIPatchCatalogProviding,
     RuntimeUIAttributePatching,
-    RuntimeUIAppDiscoveryDiagnosing {
+    RuntimeUIAppDiscoveryDiagnosing,
+    RuntimeUIProviderLifecycle {
     package let descriptor = RuntimeUIProviderDescriptor(
         identifier: "astrolabe-android-runtime",
         platform: .android,
@@ -182,6 +183,11 @@ package final class AstrolabeAndroidRuntimeProvider:
             appID: binding.appID.rawValue,
             response: try session.clearAttributePatches()
         )
+    }
+
+    package func close() {
+        sessionStore.close()
+        connectionRegistry.close()
     }
 
     private func resolve(appId: String) throws -> AndroidRuntimeBinding {

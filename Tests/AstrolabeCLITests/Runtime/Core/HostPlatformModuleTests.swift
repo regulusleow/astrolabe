@@ -100,6 +100,20 @@ final class HostPlatformModuleTests: XCTestCase {
         XCTAssertEqual(result.data?.apps.map(\.appId), ["android:demo"])
     }
 
+    func testCommandRunnerClosesPlatformProviderResourcesExplicitly() throws {
+        let provider = LifecycleProvider()
+        let module = try HostPlatformModuleBuilder(provider: provider)
+            .applicationDiscovery(provider)
+            .build()
+        let runner = try CLICommandRunner(platformModules: [module])
+
+        _ = try runner.run(arguments: ["list-apps"])
+        runner.close()
+        runner.close()
+
+        XCTAssertEqual(provider.closeCallCount, 1)
+    }
+
     func testCommandRunnerRoutesNodeDetailSemanticsUsingCommandAppID() throws {
         let provider = NodeDetailOnlyProvider()
         let module = try HostPlatformModuleBuilder(provider: provider)
@@ -270,6 +284,32 @@ private final class CompleteHierarchyProvider:
 
     func fetchHierarchy(appId: String) throws -> [String: Any] {
         [:]
+    }
+}
+
+private final class LifecycleProvider:
+    RuntimeUIProviderTargeting,
+    RuntimeApplicationDiscovering,
+    RuntimeUIProviderLifecycle {
+    /// Capability descriptor for the fake Provider.
+    let descriptor = RuntimeUIProviderDescriptor(
+        identifier: "lifecycle-provider",
+        platform: .android,
+        capabilities: [.appDiscovery]
+    )
+
+    private(set) var closeCallCount = 0
+
+    func canHandle(appId: String) -> Bool {
+        false
+    }
+
+    func fetchApps() throws -> [InspectableAppRecord] {
+        []
+    }
+
+    func close() {
+        closeCallCount += 1
     }
 }
 

@@ -33,7 +33,8 @@
     "test:smoke": "node scripts/smoke-test.mjs",
     "test:cli": "node scripts/smoke-test.mjs --cli-only",
     "test:mcp": "node scripts/smoke-test.mjs --mcp-only",
-    "test:usb": "node scripts/smoke-test.mjs --usb-only"
+    "test:usb": "node scripts/smoke-test.mjs --usb-only",
+    "test:emulator": "node scripts/smoke-test.mjs --emulator-only"
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"

@@ -45,15 +45,14 @@ export function pickApp(apps, appId, options = {}) {
 }
 
 export function findDetailOidCandidate(nodes) {
-  const candidate = nodes.find((item) => item.className === "UILabel" && nodeIdentifier(item))
-    ?? nodes.find((item) => nodeIdentifier(item));
-  if (!candidate) {
-    throw new Error("No OID found for reading node details");
-  }
-  return nodeIdentifier(candidate);
+  return nodeIdentifier(inspectableNodeCandidate(nodes));
 }
 
 export function pickInspectableClassName(nodes) {
+  return inspectableNodeCandidate(nodes).className;
+}
+
+function inspectableNodeCandidate(nodes) {
   const visibleNodes = nodes.filter((item) => (
     typeof item.className === "string"
     && item.className.length > 0
@@ -68,7 +67,31 @@ export function pickInspectableClassName(nodes) {
   if (!candidate) {
     throw new Error("No visible inspectable node class found");
   }
-  return candidate.className;
+  return candidate;
+}
+
+export function findReversibleStringPatch(detailAttributes, patchableAttributes) {
+  for (const patchableAttribute of patchableAttributes) {
+    const allowedValues = patchableAttribute.valueConstraints?.allowedValues;
+    if (
+      patchableAttribute.valueType !== "string"
+      || (Array.isArray(allowedValues) && allowedValues.length > 0)
+      || typeof patchableAttribute.attributePattern !== "string"
+    ) {
+      continue;
+    }
+    const detailIdentifier = patchableAttribute.attributePattern.split(".").at(-1);
+    const detailAttribute = detailAttributes.find((item) => (
+      item.identifier === detailIdentifier && typeof item.value === "string"
+    ));
+    if (detailAttribute) {
+      return {
+        attributeIdentifier: patchableAttribute.attributePattern,
+        value: detailAttribute.value
+      };
+    }
+  }
+  throw new Error("No reversible string patch candidate found");
 }
 
 function nodeIdentifier(node) {

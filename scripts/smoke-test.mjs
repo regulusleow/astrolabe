@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   collectObjects,
+  findReversibleStringPatch,
   pickApp,
   pickInspectableClassName,
   retryUntilApps
@@ -23,7 +24,15 @@ const args = new Set(process.argv.slice(2));
 const shouldRunCLI = !args.has("--mcp-only");
 const shouldRunMCP = !args.has("--cli-only");
 const selectedConnectionKind = process.env.ASTROLABE_CONNECTION_KIND
-  ?? (args.has("--usb-only") ? "usb" : args.has("--simulator-only") ? "simulator" : "");
+  ?? (
+    args.has("--usb-only")
+      ? "usb"
+      : args.has("--emulator-only")
+        ? "emulator"
+        : args.has("--simulator-only")
+          ? "simulator"
+          : ""
+  );
 const selectedScreenshotSource = process.env.ASTROLABE_SCREENSHOT_SOURCE ?? "";
 const selectedScreenshotTargetIdentifier = process.env.ASTROLABE_SCREENSHOT_TARGET_ID ?? "";
 const expectedMCPToolNames = [
@@ -280,6 +289,12 @@ async function runCLISmokeTest() {
   assert(checkedDetail.data?.passed === true, `check-node-detail check failed: ${JSON.stringify(checkedDetail.data?.failures)}`);
   assert(Array.isArray(checkedDetail.data?.failures), "check-node-detail did not return failures array");
   console.log(`CLI check-node-detail passed: attribute=${detailAttributeName(detailAttribute)}`);
+
+  runCLIPatchLifecycle(
+    selectedAppId,
+    selectedOid,
+    detailSummary.data.attributes
+  );
 }
 
 async function runMCPSmokeTest() {
@@ -470,6 +485,13 @@ async function runMCPSmokeTest() {
     assert(Array.isArray(checkedDetail.structuredContent?.data?.failures), "MCP check_node_detail did not return failures array");
     console.log(`MCP check_node_detail passed: attribute=${detailAttributeName(detailAttribute)}`);
 
+    await runMCPPatchLifecycle(
+      client,
+      selectedAppId,
+      selectedOid,
+      detailSummary.structuredContent.data.attributes
+    );
+
     const missingSnapshot = await client.callToolAllowingError("capture_hierarchy", {
       appId: selectedAppId,
       snapshotId: "00000000-0000-4000-8000-000000000000"
@@ -514,6 +536,89 @@ function buildCheckNodeArgs(appId, className) {
     "true",
     "--json"
   ];
+}
+
+function runCLIPatchLifecycle(appId, oid, detailAttributes) {
+  const initialList = runInspector(["list-attribute-patches", appId, "--json"]);
+  assert(initialList.data?.patchCount === 0, "CLI patch lifecycle requires a clean Runtime patch state");
+  const catalog = runInspector(["list-patchable-attributes", appId, "--json"]);
+  const candidate = findReversibleStringPatch(
+    detailAttributes,
+    catalog.data?.attributes ?? []
+  );
+  const applied = runInspector([
+    "apply-attribute-patch",
+    appId,
+    oid,
+    "--attribute",
+    candidate.attributeIdentifier,
+    "--value",
+    candidate.value,
+    "--json"
+  ]);
+  const patchId = applied.data?.patch?.patchId;
+  let reverted;
+  try {
+    assert(
+      typeof patchId === "string" && patchId.length > 0,
+      "CLI apply-attribute-patch did not return patchId"
+    );
+    const activeList = runInspector(["list-attribute-patches", appId, "--json"]);
+    assert(
+      activeList.data?.patches?.some((item) => item.patchId === patchId),
+      "CLI list-attribute-patches did not return the applied patch"
+    );
+  } finally {
+    reverted = typeof patchId === "string" && patchId.length > 0
+      ? runInspector(["revert-attribute-patch", appId, patchId, "--json"])
+      : runInspector(["clear-attribute-patches", appId, "--json"]);
+  }
+  assert(
+    reverted.data?.remainingPatchCount === 0,
+    "CLI patch lifecycle did not restore a clean state"
+  );
+  console.log(`CLI attribute patch lifecycle passed: attribute=${candidate.attributeIdentifier}`);
+}
+
+async function runMCPPatchLifecycle(client, appId, oid, detailAttributes) {
+  const initialList = await client.callTool("list_attribute_patches", { appId });
+  assert(
+    initialList.structuredContent?.data?.patchCount === 0,
+    "MCP patch lifecycle requires a clean Runtime patch state"
+  );
+  const catalog = await client.callTool("list_patchable_attributes", { appId });
+  const candidate = findReversibleStringPatch(
+    detailAttributes,
+    catalog.structuredContent?.data?.attributes ?? []
+  );
+  const applied = await client.callTool("apply_attribute_patch", {
+    appId,
+    oid,
+    attribute: candidate.attributeIdentifier,
+    value: candidate.value
+  });
+  const patchId = applied.structuredContent?.data?.patch?.patchId;
+  let reverted;
+  try {
+    assert(
+      typeof patchId === "string" && patchId.length > 0,
+      "MCP apply_attribute_patch did not return patchId"
+    );
+    const activeList = await client.callTool("list_attribute_patches", { appId });
+    assert(
+      activeList.structuredContent?.data?.patches?.some((item) => item.patchId === patchId),
+      "MCP list_attribute_patches did not return the applied patch"
+    );
+  } finally {
+    reverted = typeof patchId === "string" && patchId.length > 0
+      ? await client.callTool("revert_attribute_patch", { appId, patchId })
+      : await client.callTool("clear_attribute_patches", { appId });
+  }
+  assert(
+    reverted.structuredContent?.data?.remainingPatchCount === 0,
+    "MCP patch lifecycle did not restore a clean state"
+  );
+  console.log(`MCP attribute patch lifecycle passed: attribute=${candidate.attributeIdentifier}`);
 }
 
 function buildScreenshotSourceArgs() {

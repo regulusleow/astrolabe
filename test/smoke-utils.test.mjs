@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   collectObjects,
   findDetailOidCandidate,
+  findReversibleStringPatch,
   pickApp,
   pickInspectableClassName,
   retryUntilApps
@@ -113,6 +114,22 @@ test("findDetailOidCandidate prefers UILabel", () => {
   assert.equal(findDetailOidCandidate(nodes), "2");
 });
 
+test("findDetailOidCandidate prefers a visible Android text node", () => {
+  const nodes = [
+    {
+      className: "android.view.ViewGroup",
+      oid: "1"
+    },
+    {
+      className: "android.widget.TextView",
+      oid: "2",
+      text: "Title"
+    }
+  ];
+
+  assert.equal(findDetailOidCandidate(nodes), "2");
+});
+
 test("findDetailOidCandidate falls back to any node oid", () => {
   const nodes = [
     {
@@ -189,6 +206,57 @@ test("pickInspectableClassName rejects hierarchies without inspectable nodes", (
   assert.throws(
     () => pickInspectableClassName([{ className: "android.view.View" }]),
     /No visible inspectable node class found/
+  );
+});
+
+test("findReversibleStringPatch matches catalog semantics to current detail values", () => {
+  const patch = findReversibleStringPatch(
+    [
+      {
+        identifier: "text",
+        value: "Current title"
+      }
+    ],
+    [
+      {
+        attributePattern: "android.text.text",
+        valueType: "string",
+        targetRoles: ["text"]
+      }
+    ]
+  );
+
+  assert.deepEqual(patch, {
+    attributeIdentifier: "android.text.text",
+    value: "Current title"
+  });
+});
+
+test("findReversibleStringPatch ignores constrained string attributes", () => {
+  assert.throws(
+    () => findReversibleStringPatch(
+      [
+        {
+          identifier: "visibility",
+          value: "visible"
+        }
+      ],
+      [
+        {
+          attributePattern: "android.view.visibility",
+          valueType: "string",
+          valueConstraints: {
+            allowedValues: [
+              {
+                type: "string",
+                value: "visible"
+              }
+            ]
+          }
+        }
+      ]
+    ),
+    /No reversible string patch candidate found/
   );
 });
 

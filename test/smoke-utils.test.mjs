@@ -5,6 +5,7 @@ import {
   collectObjects,
   findDetailOidCandidate,
   pickApp,
+  pickInspectableClassName,
   retryUntilApps
 } from "../scripts/smoke-utils.mjs";
 
@@ -132,6 +133,63 @@ test("findDetailOidCandidate accepts non-numeric opaque identifiers", () => {
   ];
 
   assert.equal(findDetailOidCandidate(nodes), "node-title");
+});
+
+test("pickInspectableClassName prefers a visible text node across platforms", () => {
+  const nodes = [
+    {
+      className: "android.view.View",
+      detailOid: "1"
+    },
+    {
+      className: "android.widget.TextView",
+      detailOid: "2",
+      text: "Title"
+    }
+  ];
+
+  assert.equal(pickInspectableClassName(nodes), "android.widget.TextView");
+});
+
+test("pickInspectableClassName falls back to any visible inspectable node", () => {
+  const nodes = [
+    {
+      className: "android.view.ViewGroup",
+      detailOid: "1"
+    }
+  ];
+
+  assert.equal(pickInspectableClassName(nodes), "android.view.ViewGroup");
+});
+
+test("pickInspectableClassName ignores hidden and transparent nodes", () => {
+  const nodes = [
+    {
+      className: "UILabel",
+      detailOid: "1",
+      hidden: true,
+      text: "Hidden"
+    },
+    {
+      className: "android.widget.TextView",
+      detailOid: "2",
+      alpha: 0,
+      text: "Transparent"
+    },
+    {
+      className: "android.widget.Button",
+      detailOid: "3"
+    }
+  ];
+
+  assert.equal(pickInspectableClassName(nodes), "android.widget.Button");
+});
+
+test("pickInspectableClassName rejects hierarchies without inspectable nodes", () => {
+  assert.throws(
+    () => pickInspectableClassName([{ className: "android.view.View" }]),
+    /No visible inspectable node class found/
+  );
 });
 
 test("retryUntilApps retries empty app list", async () => {

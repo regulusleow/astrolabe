@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   collectObjects,
   pickApp,
+  pickInspectableClassName,
   retryUntilApps
 } from "./smoke-utils.mjs";
 import { canonicalRepositoryVersion } from "./versioning.mjs";
@@ -226,8 +227,8 @@ async function runCLISmokeTest() {
     rmSync(cliScreenshotDir, { recursive: true, force: true });
   }
 
-  const foundNodes = runInspector(["find-nodes", selectedAppId, "--class", "UI", "--visible-only", "--limit", "5", "--json"]);
-  assert(Number(foundNodes.data?.totalCount) > 0, "find-nodes found no visible UI nodes");
+  const foundNodes = runInspector(["find-nodes", selectedAppId, "--class", inspectClassName, "--visible-only", "--limit", "5", "--json"]);
+  assert(Number(foundNodes.data?.totalCount) > 0, "find-nodes found no visible inspectable nodes");
   assert(Array.isArray(foundNodes.data?.nodes), "find-nodes did not return nodes array");
   if (foundNodes.data.hasMore) {
     assert(typeof foundNodes.data.nextCursor === "string", "find-nodes did not return nextCursor");
@@ -235,7 +236,7 @@ async function runCLISmokeTest() {
       "find-nodes",
       selectedAppId,
       "--class",
-      "UI",
+      inspectClassName,
       "--visible-only",
       "--limit",
       "5",
@@ -413,17 +414,17 @@ async function runMCPSmokeTest() {
 
     const foundNodes = await client.callTool("find_nodes", {
       appId: selectedAppId,
-      className: "UI",
+      className: inspectClassName,
       visibleOnly: true,
       limit: 5
     });
-    assert(Number(foundNodes.structuredContent?.data?.totalCount) > 0, "MCP find_nodes found no visible UI nodes");
+    assert(Number(foundNodes.structuredContent?.data?.totalCount) > 0, "MCP find_nodes found no visible inspectable nodes");
     assert(Array.isArray(foundNodes.structuredContent?.data?.nodes), "MCP find_nodes did not return nodes array");
     if (foundNodes.structuredContent.data.hasMore) {
       assert(typeof foundNodes.structuredContent.data.nextCursor === "string", "MCP find_nodes did not return nextCursor");
       const nextPage = await client.callTool("find_nodes", {
         appId: selectedAppId,
-        className: "UI",
+        className: inspectClassName,
         visibleOnly: true,
         limit: 5,
         cursor: foundNodes.structuredContent.data.nextCursor
@@ -498,16 +499,6 @@ function runInspector(commandArgs) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Unable to parse CLI JSON: ${message}\n${result.stdout}`);
   }
-}
-
-function pickInspectableClassName(nodes) {
-  const visibleLabel = nodes.find((item) => (
-    item.className === "UILabel" &&
-    item.detailOid &&
-    item.hidden !== true &&
-    Number(item.alpha ?? 1) > 0
-  ));
-  return visibleLabel ? "UILabel" : "UI";
 }
 
 function buildCheckNodeArgs(appId, className) {

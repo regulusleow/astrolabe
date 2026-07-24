@@ -53,6 +53,24 @@ export function findDetailOidCandidate(nodes) {
   return nodeIdentifier(candidate);
 }
 
+export function pickInspectableClassName(nodes) {
+  const visibleNodes = nodes.filter((item) => (
+    typeof item.className === "string"
+    && item.className.length > 0
+    && nodeIdentifier(item)
+    && item.hidden !== true
+    && Number(item.alpha ?? 1) > 0
+  ));
+  const textNode = visibleNodes.find((item) => (
+    typeof item.text === "string" && item.text.length > 0
+  )) ?? visibleNodes.find((item) => /(?:Label|TextView)$/.test(item.className));
+  const candidate = textNode ?? visibleNodes[0];
+  if (!candidate) {
+    throw new Error("No visible inspectable node class found");
+  }
+  return candidate.className;
+}
+
 function nodeIdentifier(node) {
   for (const value of [node.detailOid, node.oid]) {
     if (typeof value === "string" && value.length > 0) {

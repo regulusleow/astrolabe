@@ -136,6 +136,151 @@ final class AstrolabeAndroidRuntimeProviderTests: XCTestCase {
         ])
     }
 
+    func testProviderDiscoversRuntimesAcrossMultipleDevices() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            568ced7b device product:salami model:CPH2581 device:OP595DL1 transport_id:2
+            """),
+            commandOutput("0: 2 0 10000 1 01 1 @astrolabe_321\n"),
+            commandOutput("47231\n"),
+            commandOutput("0: 2 0 10000 1 01 1 @astrolabe_654\n"),
+            commandOutput("47232\n")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-emulator"),
+                    appInfo: try makeAppInfo(
+                        processIdentifier: "321",
+                        instanceIdentifier: "runtime-emulator",
+                        applicationIdentifier: "com.example.emulator"
+                    )
+                ),
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-device"),
+                    appInfo: try makeAppInfo(
+                        processIdentifier: "654",
+                        instanceIdentifier: "runtime-device",
+                        applicationIdentifier: "com.example.device"
+                    )
+                )
+            ])
+        )
+
+        let apps = try provider.fetchApps()
+
+        XCTAssertEqual(apps.map(\.applicationIdentifier), [
+            "com.example.emulator",
+            "com.example.device"
+        ])
+        XCTAssertEqual(apps.map(\.deviceId), ["emulator-5554", "568ced7b"])
+        XCTAssertEqual(apps.map(\.endpointPort), [47_231, 47_232])
+    }
+
+    func testProviderReplacesRestartedRuntimeAndClosesPreviousForward() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("0: 2 0 10000 1 01 1 @astrolabe_321\n"),
+            commandOutput("47231\n"),
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("0: 2 0 10000 1 01 1 @astrolabe_321\n"),
+            commandOutput("47232\n"),
+            commandOutput("")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-before"),
+                    appInfo: try makeAppInfo(instanceIdentifier: "runtime-before")
+                ),
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(instanceIdentifier: "runtime-after"),
+                    appInfo: try makeAppInfo(instanceIdentifier: "runtime-after")
+                )
+            ])
+        )
+
+        let firstAppID = try XCTUnwrap(try provider.fetchApps().first?.appId)
+        let secondAppID = try XCTUnwrap(try provider.fetchApps().first?.appId)
+
+        XCTAssertNotEqual(firstAppID, secondAppID)
+        XCTAssertTrue(runner.invocations.contains([
+            "-s", "emulator-5554", "forward", "--remove", "tcp:47231"
+        ]))
+    }
+
+    func testProviderRemovesForwardWhenADBDeviceDisconnects() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("0: 2 0 10000 1 01 1 @astrolabe_321\n"),
+            commandOutput("47231\n"),
+            commandOutput("""
+            List of devices attached
+            emulator-5554 offline transport_id:1
+            """),
+            commandOutput("")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(),
+                    appInfo: try makeAppInfo()
+                )
+            ])
+        )
+
+        XCTAssertEqual(try provider.fetchApps().count, 1)
+        XCTAssertTrue(try provider.fetchApps().isEmpty)
+
+        XCTAssertEqual(provider.appDiscoveryDiagnostics().first?.errorCode, "adb_device_offline")
+        XCTAssertTrue(runner.invocations.contains([
+            "-s", "emulator-5554", "forward", "--remove", "tcp:47231"
+        ]))
+    }
+
+    func testProviderDeduplicatesRuntimeSocketEntries() throws {
+        let runner = RecordingADBCommandRunner(results: [
+            commandOutput("""
+            List of devices attached
+            emulator-5554 device product:sdk model:Pixel_9 device:emu transport_id:1
+            """),
+            commandOutput("""
+            0: 2 0 10000 1 01 1 @astrolabe_321
+            1: 2 0 10000 1 01 1 @astrolabe_321
+            """),
+            commandOutput("47231\n")
+        ])
+        let provider = AstrolabeAndroidRuntimeProvider(
+            adbClient: ADBClient(commandRunner: runner),
+            clientFactory: QueueRuntimeClientFactory(clients: [
+                FakeRuntimeClient(
+                    handshake: try makeHandshake(),
+                    appInfo: try makeAppInfo()
+                )
+            ])
+        )
+
+        XCTAssertEqual(try provider.fetchApps().count, 1)
+        XCTAssertEqual(
+            runner.invocations.filter { $0.contains("localabstract:astrolabe_321") }.count,
+            1
+        )
+    }
+
     private func commandOutput(_ value: String) -> ADBCommandResult {
         ADBCommandResult(
             standardOutput: Data(value.utf8),
@@ -144,14 +289,16 @@ final class AstrolabeAndroidRuntimeProviderTests: XCTestCase {
         )
     }
 
-    private func makeHandshake() throws -> RuntimeHandshakePayload {
+    private func makeHandshake(
+        instanceIdentifier: String = "runtime-42"
+    ) throws -> RuntimeHandshakePayload {
         RuntimeHandshakePayload(
             runtime: RuntimeDescriptor(
                 identifier: try RuntimeNamespacedIdentifier(
                     rawValue: "astrolabe.runtime-android"
                 ),
                 version: "1.0.0",
-                instanceID: try RuntimeOpaqueIdentifier(rawValue: "runtime-42")
+                instanceID: try RuntimeOpaqueIdentifier(rawValue: instanceIdentifier)
             ),
             platform: "android",
             negotiatedProtocolVersion: .v2,
@@ -168,17 +315,19 @@ final class AstrolabeAndroidRuntimeProviderTests: XCTestCase {
     }
 
     private func makeAppInfo(
-        processIdentifier: String = "321"
+        processIdentifier: String = "321",
+        instanceIdentifier: String = "runtime-42",
+        applicationIdentifier: String = "com.example.demo"
     ) throws -> RuntimeApplicationInfoPayload {
         RuntimeApplicationInfoPayload(
             application: RuntimeApplication(
-                identifier: "com.example.demo",
+                identifier: applicationIdentifier,
                 displayName: "Demo",
                 version: "1.0",
                 buildVersion: "1"
             ),
             target: RuntimeTarget(
-                identifier: try RuntimeOpaqueIdentifier(rawValue: "runtime-42"),
+                identifier: try RuntimeOpaqueIdentifier(rawValue: instanceIdentifier),
                 processIdentifier: processIdentifier,
                 kind: "application",
                 primary: true

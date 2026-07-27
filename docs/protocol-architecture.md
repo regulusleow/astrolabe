@@ -9,7 +9,7 @@ Android Runtime.
 This design is implemented. The former `AstrolabeRuntimeProtocol` moved out of
 `astrolabe-runtime-ios`, and Host no longer obtains protocol models through the
 iOS Runtime. Both `astrolabe` and `astrolabe-runtime-ios` directly pin the
-independent `AstrolabeProtocol 1.0.0` package.
+independent `AstrolabeProtocol 2.0.0` package.
 
 After this separation, platform Runtime implementation changes no longer force
 Host dependency updates. Host and platform Runtimes update the protocol package
@@ -108,16 +108,16 @@ The protocol has three independent versions that must not be conflated:
 
 | Version | Example | Purpose |
 | --- | --- | --- |
-| Package version | `AstrolabeProtocol 1.0.0` | SwiftPM dependency and release |
+| Package version | `AstrolabeProtocol 2.0.0` | SwiftPM dependency and release |
 | Wire Protocol version | `2.0` | Runtime handshake and compatibility decisions |
-| Product version | `astrolabe 1.0.0`, `runtime-ios 1.0.0` | Independent Host and platform SDK releases |
+| Product version | `astrolabe 2.0.0`, `runtime-ios 2.0.0`, `runtime-android 2.0.0` | Independent Host and platform SDK releases |
 
 Host and the iOS Runtime use explicit semantic-version dependencies:
 
 ```swift
 .package(
     url: "https://github.com/regulusleow/astrolabe-protocol.git",
-    exact: "1.0.0"
+    exact: "2.0.0"
 )
 ```
 
@@ -139,7 +139,7 @@ Compatibility rules:
 Wire Protocol 2.0 provides the platform-neutral contract used by the initial
 open-source package releases:
 
-- The `astrolabe-protocol` package release starts at `1.0.0`.
+- The cross-platform Runtime release line uses `AstrolabeProtocol 2.0.0`.
 - The Wire Protocol major version advances to `2.0`.
 - Shared models use platform-neutral semantics such as application identifier.
 - Protocol defines only shared DTOs, value types, extension points, Schemas,
@@ -202,7 +202,7 @@ validates client behavior through protocol Fixtures and replaceable transports.
 | --- | --- |
 | Create the protocol repository and migrate Swift models, codecs, and protocol tests | Complete |
 | Preserve the V1 specification, Schemas, and Fixtures as release history | Complete; current machine contracts live under the 2.0 assets |
-| Prepare the `AstrolabeProtocol 1.0.0` open-source release | Ready for review |
+| Prepare the `AstrolabeProtocol 2.0.0` open-source release | Ready for review |
 | Make Runtime depend on the independent protocol package and remove its local protocol target | Complete |
 | Make Host depend directly on the independent protocol package | Complete |
 | Remove the complete `AstrolabeRuntime` product dependency from Host tests | Complete |

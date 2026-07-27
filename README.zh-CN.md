@@ -5,10 +5,13 @@
 Astrolabe 是一款面向 AI 编码智能体的运行时 UI 检查工具。它结合 Swift
 CLI、本地 MCP Server 和配套的 Agent Skill，用于检查和验证正在运行的移动端界面。
 
+Android View 检查由 Astrolabe Android Runtime 2.0 提供支持。
+
 ## 功能
 
-- 发现运行在 iOS 模拟器或已配对 USB 设备上的受支持 App。
-- 检查 UI 层级、节点 Frame、可见性、文本、样式、语义角色和详细运行时属性。
+- 发现运行在 iOS 模拟器、Android 模拟器或 USB 连接设备上的受支持 App。
+- 检查 UIKit 和 Android View 层级、节点 Frame、可见性、文本、样式、语义角色和
+  详细运行时属性。
 - 获取原生分辨率截图，并与预期图片或已记录的 Baseline 进行比较。
 - 查询节点，并校验样式、布局和节点详情是否符合预期。
 - 通过冻结的页面快照，让相关层级操作始终基于同一个页面状态。
@@ -20,6 +23,7 @@ CLI、本地 MCP Server 和配套的 Agent Skill，用于检查和验证正在�
 - macOS 13 或更高版本
 - Swift 5.9 或更高版本
 - Node.js 22 或更高版本
+- 检查 Android App 时需要 Android Platform Tools（ADB）
 - 在 Debug 构建中启用了 Astrolabe Runtime SDK 的受支持 App
 
 ## 安装
@@ -118,15 +122,17 @@ npm run test:usb
 ## 相关仓库
 
 - [astrolabe-protocol](https://github.com/regulusleow/astrolabe-protocol)：与平台无关的
-  Wire Protocol、Schema、Fixture 和 Swift DTO。
+  Wire Protocol、Schema、Fixture，以及 Swift/Kotlin DTO 和 Codec。
 - [astrolabe-runtime-ios](https://github.com/regulusleow/astrolabe-runtime-ios)：仅用于
   Debug 构建的 UIKit Runtime SDK。
+- [astrolabe-runtime-android](https://github.com/regulusleow/astrolabe-runtime-android)：
+  仅用于 Debug 构建的 Android View Runtime SDK。
 
 Astrolabe Host 直接使用共享协议，不依赖具体平台的 Runtime 实现 Package。
 
 ## 路线图
 
-- 支持 Android Runtime 和 Host。
+- 支持 Jetpack Compose Runtime 检查。
 - 集成更多 AI 编码平台。
 
 ## 许可证

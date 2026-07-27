@@ -80,6 +80,22 @@ test("Astrolabe skill is platform-neutral and capability-driven", async () => {
   assert.doesNotMatch(skill, /`ios_[a-z_]+`|`android_[a-z_]+`/);
 });
 
+test("public documentation advertises delivered Android View support", async () => {
+  const readme = await readProjectFile("README.md");
+  const skillMetadata = await readProjectFile(
+    "skills/astrolabe/agents/openai.yaml"
+  );
+
+  assert.match(readme, /Android View/);
+  assert.match(readme, /ADB/);
+  assert.match(readme, /astrolabe-runtime-android/);
+  assert.match(readme, /Runtime for Android 2\.0/);
+  assert.doesNotMatch(readme, /release preparation/);
+  assert.doesNotMatch(readme, /- Android Runtime and Host support\./);
+  assert.match(skillMetadata, /running mobile app/);
+  assert.doesNotMatch(skillMetadata, /running iOS app/);
+});
+
 test("AI client commands reuse the shared installer", async () => {
   const rootPackage = JSON.parse(await readProjectFile("package.json"));
   const packageLock = JSON.parse(await readProjectFile("package-lock.json"));

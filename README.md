@@ -6,11 +6,14 @@ Astrolabe is a runtime UI inspection tool for AI coding agents. It combines a
 Swift CLI, a local MCP server, and a packaged agent skill to inspect and verify
 running mobile interfaces.
 
+Android View inspection is supported through Astrolabe Runtime for Android 2.0.
+
 ## Features
 
-- Discover supported apps running in iOS simulators or on paired USB devices.
-- Inspect UI hierarchies, node frames, visibility, text, styles, semantic roles,
-  and detailed runtime attributes.
+- Discover supported apps running in iOS simulators, Android emulators, or on
+  USB-connected devices.
+- Inspect UIKit and Android View hierarchies, node frames, visibility, text,
+  styles, semantic roles, and detailed runtime attributes.
 - Capture native-resolution screenshots and compare them with expected images
   or recorded baselines.
 - Query nodes and verify style, layout, and node-detail expectations.
@@ -25,6 +28,7 @@ running mobile interfaces.
 - macOS 13 or later
 - Swift 5.9 or later
 - Node.js 22 or later
+- Android Platform Tools (ADB) when inspecting Android apps
 - A supported app with an Astrolabe Runtime SDK enabled in Debug builds
 
 ## Installation
@@ -129,16 +133,19 @@ npm run test:usb
 ## Repositories
 
 - [astrolabe-protocol](https://github.com/regulusleow/astrolabe-protocol):
-  platform-neutral Wire Protocol, Schemas, Fixtures, and Swift DTOs.
+  platform-neutral Wire Protocol, Schemas, Fixtures, and Swift/Kotlin DTOs and
+  Codecs.
 - [astrolabe-runtime-ios](https://github.com/regulusleow/astrolabe-runtime-ios):
   Debug-only UIKit Runtime SDK.
+- [astrolabe-runtime-android](https://github.com/regulusleow/astrolabe-runtime-android):
+  Debug-only Android View Runtime SDK.
 
 Astrolabe Host consumes the shared protocol directly and does not depend on a
 platform Runtime implementation package.
 
 ## Roadmap
 
-- Android Runtime and Host support.
+- Jetpack Compose Runtime inspection.
 - Integrations for additional AI coding platforms.
 
 ## License

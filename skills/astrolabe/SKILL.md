@@ -118,8 +118,9 @@ a UI is correct from source inspection alone when an inspectable App is running.
      `snapshotId`. Do not claim that a screenshot taken after navigation is
      pixel-synchronized with an older hierarchy snapshot.
    - Use node attributes for exact logical values such as frames, spacing, font
-     size, colors, and corner radius. On iOS, logical geometry maps to points;
-     do not generalize that platform mapping to every Runtime.
+     size, colors, and corner radius. On iOS, logical geometry maps to points.
+     On Android View, it maps to density-independent pixels after Runtime
+     density normalization.
    - Use `compare_screenshot` when an expected PNG exists and pixel-level pass
      or fail is sufficient.
    - Use `inspect_diff` when the AI must explain mismatch regions, correlate
@@ -269,7 +270,8 @@ When a node cannot be found:
 
 - Runtime frames and spacing declare `unit: "logical"`; screenshot dimensions
   and ignore regions declare pixel units. Convert only with the reported
-  logical-to-pixel scale. On iOS, logical units correspond to points.
+  logical-to-pixel scale. On iOS, logical units correspond to points; on
+  Android View, they correspond to density-independent pixels.
 - A hierarchy `snapshotId` freezes node identity, structure, geometry, and
   basic attributes for up to five minutes. Local quota eviction can shorten
   that lifetime. It does not freeze the device screen.

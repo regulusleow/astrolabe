@@ -1,4 +1,4 @@
 interface:
   display_name: "Astrolabe UI Inspector"
-  short_description: "Use Astrolabe MCP to verify a running iOS UI"
-  default_prompt: "Use Astrolabe MCP to inspect the running iOS app, find the correct nodes, and verify UI spacing, text, font, color, frame, and screenshots."
+  short_description: "Use Astrolabe MCP to verify a running mobile UI"
+  default_prompt: "Use Astrolabe MCP to inspect the running mobile app, find the correct nodes, and verify UI spacing, text, font, color, frame, and screenshots."

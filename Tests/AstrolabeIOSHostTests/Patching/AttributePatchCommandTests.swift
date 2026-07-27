@@ -15,6 +15,51 @@ import UniformTypeIdentifiers
 private typealias Fixtures = CLICommandTestFixtures
 
 final class AttributePatchCommandTests: XCTestCase {
+    func testPatchValueParserBuildsMeasurementFromCatalogUnit() throws {
+        let attribute = try RuntimePatchableAttribute(
+            attributePattern: "android.text.fontSize",
+            valueType: RuntimePatchValueType(rawValue: "measurement"),
+            targetRoles: ["text"],
+            valueConstraints: RuntimePatchValueConstraints(
+                minimum: 0,
+                maximum: nil,
+                minimumExclusive: true,
+                maximumExclusive: false,
+                acceptedFormats: ["scaledLogical"],
+                allowedValues: []
+            ),
+            extensions: RuntimeExtensionMap()
+        )
+
+        let value = try RuntimeAttributePatchValueParser().parse("20", for: attribute)
+
+        XCTAssertEqual(
+            value,
+            .measurement(RuntimeMeasurement(value: 20, unit: .scaledLogical))
+        )
+    }
+
+    func testPatchValueParserRejectsValuesOutsideTheCatalogAllowlist() throws {
+        let attribute = try RuntimePatchableAttribute(
+            attributePattern: "android.image.scaleType",
+            valueType: RuntimePatchValueType(rawValue: "string"),
+            targetRoles: ["image"],
+            valueConstraints: RuntimePatchValueConstraints(
+                minimum: nil,
+                maximum: nil,
+                minimumExclusive: false,
+                maximumExclusive: false,
+                acceptedFormats: [],
+                allowedValues: [.string("CENTER"), .string("FIT_CENTER")]
+            ),
+            extensions: RuntimeExtensionMap()
+        )
+
+        XCTAssertThrowsError(
+            try RuntimeAttributePatchValueParser().parse("INVALID", for: attribute)
+        )
+    }
+
     func testAttributePatchCommandsRouteTypedValues() throws {
         let service = Fixtures.FakeInspectorService()
         service.attributePatchResult = ["patchCount": 1]

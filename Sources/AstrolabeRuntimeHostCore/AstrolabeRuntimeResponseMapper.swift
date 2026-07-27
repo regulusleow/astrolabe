@@ -2,24 +2,26 @@
 //  AstrolabeRuntimeResponseMapper.swift
 //  astrolabe
 //
-//  Created by 轩辕十四 on 2026/7/11.
+//  Created by 轩辕十四 on 2026/7/22.
 //
 
 import AstrolabeCLI
 import AstrolabeProtocol
 import Foundation
 
-struct AstrolabeRuntimeResponseMapper {
+package struct AstrolabeRuntimeResponseMapper {
     private let valueMapper = RuntimeAttributeValueOutputMapper()
 
-    func hierarchy(
-        appID: AstrolabeRuntimeAppID,
+    package init() {}
+
+    package func hierarchy(
+        appID: String,
         handshake: RuntimeHandshakePayload,
         appInfo: RuntimeApplicationInfoPayload,
         snapshot: RuntimeHierarchySnapshotPayload
     ) -> [String: Any] {
         [
-            "appId": appID.rawValue,
+            "appId": appID,
             "serverVersion": handshake.runtime.version,
             "snapshotId": snapshot.snapshotID.rawValue,
             "capturedAtUnixTime": snapshot.capturedAtUnixTime,
@@ -32,52 +34,55 @@ struct AstrolabeRuntimeResponseMapper {
         ]
     }
 
-    func nodeDetail(
-        appID: AstrolabeRuntimeAppID,
+    package func nodeDetail(
+        appID: String,
         requestedNodeID: RuntimeOpaqueIdentifier,
         detail: RuntimeNodeDetailPayload
     ) -> [String: Any] {
         [
-            "appId": appID.rawValue,
+            "appId": appID,
             "requestedOid": requestedNodeID.rawValue,
             "resolvedOid": detail.nodeID.rawValue,
             "attributeGroups": detail.sections.map(attributeGroup)
         ]
     }
 
-    func attributePatch(appID: AstrolabeRuntimeAppID, patch: RuntimeAttributePatch) -> [String: Any] {
-        ["appId": appID.rawValue, "patch": attributePatchDictionary(patch)]
+    package func attributePatch(
+        appID: String,
+        patch: RuntimeAttributePatch
+    ) -> [String: Any] {
+        ["appId": appID, "patch": attributePatchDictionary(patch)]
     }
 
-    func attributePatchList(
-        appID: AstrolabeRuntimeAppID,
+    package func attributePatchList(
+        appID: String,
         list: RuntimeAttributePatchListPayload
     ) -> [String: Any] {
         [
-            "appId": appID.rawValue,
+            "appId": appID,
             "patchCount": list.patches.count,
             "patches": list.patches.map(attributePatchDictionary)
         ]
     }
 
-    func attributePatchRevert(
-        appID: AstrolabeRuntimeAppID,
+    package func attributePatchRevert(
+        appID: String,
         response: RuntimeRevertAttributePatchPayload
     ) -> [String: Any] {
         [
-            "appId": appID.rawValue,
+            "appId": appID,
             "revertedPatchId": response.revertedPatchID.rawValue,
             "restoredValue": optionalAttributeValueDictionary(response.restoredValue),
             "remainingPatchCount": response.remainingPatchCount
         ]
     }
 
-    func attributePatchClear(
-        appID: AstrolabeRuntimeAppID,
+    package func attributePatchClear(
+        appID: String,
         response: RuntimeClearAttributePatchesPayload
     ) -> [String: Any] {
         [
-            "appId": appID.rawValue,
+            "appId": appID,
             "revertedPatchIds": response.revertedPatchIDs.map(\.rawValue),
             "remainingPatchCount": response.remainingPatchCount
         ]
@@ -127,9 +132,9 @@ struct AstrolabeRuntimeResponseMapper {
         depth: Int,
         siblingIndex: Int
     ) -> [String: Any] {
-        let hierarchyVisible = !node.visibility.hidden &&
-            !node.visibility.hiddenByAncestor &&
-            node.visibility.effectiveOpacity > 0.01
+        let hierarchyVisible = !node.visibility.hidden
+            && !node.visibility.hiddenByAncestor
+            && node.visibility.effectiveOpacity > 0.01
         var result: [String: Any] = [
             "oid": node.nodeID.rawValue,
             "detailOid": node.nodeID.rawValue,
@@ -170,7 +175,9 @@ struct AstrolabeRuntimeResponseMapper {
         return result.compactMapValues { $0 }
     }
 
-    private func accessibilityDictionary(_ accessibility: RuntimeAccessibility) -> [String: Any] {
+    private func accessibilityDictionary(
+        _ accessibility: RuntimeAccessibility
+    ) -> [String: Any] {
         var result: [String: Any] = [
             "isElement": accessibility.element,
             "traits": accessibility.traits
@@ -182,7 +189,9 @@ struct AstrolabeRuntimeResponseMapper {
         return result.compactMapValues { $0 }
     }
 
-    private func interactionDictionary(_ interaction: RuntimeInteraction) -> [String: Any] {
+    private func interactionDictionary(
+        _ interaction: RuntimeInteraction
+    ) -> [String: Any] {
         var result: [String: Any] = ["interactive": interaction.interactive]
         result["enabled"] = interaction.enabled
         result["selected"] = interaction.selected
@@ -216,7 +225,9 @@ struct AstrolabeRuntimeResponseMapper {
         ]
     }
 
-    private func attributePatchDictionary(_ patch: RuntimeAttributePatch) -> [String: Any] {
+    private func attributePatchDictionary(
+        _ patch: RuntimeAttributePatch
+    ) -> [String: Any] {
         [
             "patchId": patch.patchID.rawValue,
             "oid": patch.nodeID.rawValue,
@@ -228,17 +239,24 @@ struct AstrolabeRuntimeResponseMapper {
         ]
     }
 
-    private func optionalAttributeValueDictionary(_ value: RuntimeAttributeValue?) -> Any {
-        guard let value else { return NSNull() }
+    private func optionalAttributeValueDictionary(
+        _ value: RuntimeAttributeValue?
+    ) -> Any {
+        guard let value else {
+            return NSNull()
+        }
         return attributeValueDictionary(value)
     }
 
-    private func attributeValueDictionary(_ value: RuntimeAttributeValue) -> [String: Any] {
+    private func attributeValueDictionary(
+        _ value: RuntimeAttributeValue
+    ) -> [String: Any] {
         let mappedValue = valueMapper.map(value)
         return ["type": mappedValue.typeName, "value": mappedValue.value]
     }
 
     private func colorComponents(_ color: RuntimeColor) -> [Double] {
-        [color.red, color.green, color.blue, color.alpha].map { min(1, max(0, $0)) }
+        [color.red, color.green, color.blue, color.alpha]
+            .map { min(1, max(0, $0)) }
     }
 }

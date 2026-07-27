@@ -7,6 +7,7 @@
 
 import AstrolabeCLI
 import AstrolabeIOSDeviceSupport
+import AstrolabeScreenshotSupport
 import Foundation
 
 package struct IOSSystemScreenshotProvider: PlatformScreenshotProviding {
@@ -15,7 +16,7 @@ package struct IOSSystemScreenshotProvider: PlatformScreenshotProviding {
     private let deviceIdentifierResolver: DeviceIdentifierResolving
     private let deviceLockStateReader: DeviceLockStateReading
     private let imageContentInspector: ScreenshotImageContentInspecting
-    private let payloadBuilder: ScreenshotPayloadBuilding
+    private let payloadBuilder: any SystemScreenshotPayloadBuilding
 
     package init() {
         self.init(
@@ -24,7 +25,7 @@ package struct IOSSystemScreenshotProvider: PlatformScreenshotProviding {
             deviceIdentifierResolver: DevicectlDeviceIdentifierResolver(),
             deviceLockStateReader: DevicectlDeviceLockStateReader(),
             imageContentInspector: ScreenshotImageContentInspector(),
-            payloadBuilder: ScreenshotPayloadBuilder()
+            payloadBuilder: SystemScreenshotPayloadBuilder()
         )
     }
 
@@ -34,7 +35,7 @@ package struct IOSSystemScreenshotProvider: PlatformScreenshotProviding {
         deviceIdentifierResolver: DeviceIdentifierResolving,
         deviceLockStateReader: DeviceLockStateReading,
         imageContentInspector: ScreenshotImageContentInspecting,
-        payloadBuilder: ScreenshotPayloadBuilding
+        payloadBuilder: any SystemScreenshotPayloadBuilding
     ) {
         self.simctl = simctl
         self.devicectl = devicectl
@@ -103,7 +104,13 @@ package struct IOSSystemScreenshotProvider: PlatformScreenshotProviding {
             udid = try simctl.singleBootedSimulatorUDID()
         }
         let pngData = try simctl.captureScreenshot(udid: udid)
-        return try payloadBuilder.simulatorPayload(appId: appId, hierarchy: hierarchy, pngData: pngData, simulatorUDID: udid)
+        return try payloadBuilder.payload(
+            appId: appId,
+            hierarchy: hierarchy,
+            pngData: pngData,
+            source: "simulator",
+            sourceMetadata: ["simulatorUDID": udid]
+        )
     }
 
     private func devicePayload(
@@ -124,7 +131,13 @@ package struct IOSSystemScreenshotProvider: PlatformScreenshotProviding {
             try ensureDeviceUnlocked(deviceIdentifier)
             throw CLIError.invalidScreenshot("The physical device returned an all-black image")
         }
-        return try payloadBuilder.devicePayload(appId: appId, hierarchy: hierarchy, pngData: pngData, deviceIdentifier: deviceIdentifier)
+        return try payloadBuilder.payload(
+            appId: appId,
+            hierarchy: hierarchy,
+            pngData: pngData,
+            source: "device",
+            sourceMetadata: ["deviceIdentifier": deviceIdentifier]
+        )
     }
 
     private func ensureDeviceUnlocked(_ deviceIdentifier: String) throws {

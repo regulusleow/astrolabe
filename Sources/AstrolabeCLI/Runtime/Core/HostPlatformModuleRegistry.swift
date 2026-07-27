@@ -8,8 +8,10 @@
 import AstrolabeProtocol
 import Foundation
 
-package struct HostPlatformModuleRegistry: RuntimeUIInspecting {
+package final class HostPlatformModuleRegistry: RuntimeUIInspecting {
     private let modules: [HostPlatformModule]
+    private let lifecycleLock = NSLock()
+    private var isClosed = false
 
     package init(modules: [HostPlatformModule]) throws {
         guard !modules.isEmpty else {
@@ -24,6 +26,22 @@ package struct HostPlatformModuleRegistry: RuntimeUIInspecting {
             throw HostPlatformModuleValidationError.duplicatePlatform(duplicate)
         }
         self.modules = modules
+    }
+
+    deinit {
+        close()
+    }
+
+    package func close() {
+        lifecycleLock.lock()
+        guard !isClosed else {
+            lifecycleLock.unlock()
+            return
+        }
+        isClosed = true
+        let lifecycles = modules.compactMap(\.providerLifecycle)
+        lifecycleLock.unlock()
+        lifecycles.forEach { $0.close() }
     }
 
     package func fetchApps() throws -> [InspectableAppRecord] {

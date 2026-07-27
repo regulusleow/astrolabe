@@ -90,12 +90,12 @@ jobs:
         run: |
           npm run install:codex -- \
             --package-dir "$RUNNER_TEMP/astrolabe-package" \
-            --skill-dir "$RUNNER_TEMP/skills/astrolabe" \
-            --config "$RUNNER_TEMP/codex/config.toml"
+            --user-skill-dir "$RUNNER_TEMP/skills/astrolabe" \
+            --client-config "codex=$RUNNER_TEMP/codex/config.toml"
 
       - name: Verify Codex installation
         run: |
           npm run check:codex -- \
             --package-dir "$RUNNER_TEMP/astrolabe-package" \
-            --skill-dir "$RUNNER_TEMP/skills/astrolabe" \
-            --config "$RUNNER_TEMP/codex/config.toml"
+            --user-skill-dir "$RUNNER_TEMP/skills/astrolabe" \
+            --client-config "codex=$RUNNER_TEMP/codex/config.toml"

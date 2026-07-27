@@ -9,6 +9,7 @@ import AstrolabeCLI
 import AstrolabeCoreObjC
 import AstrolabeIOSDeviceSupport
 import AstrolabeProtocol
+import AstrolabeRuntimeHostCore
 import Foundation
 
 struct USBMuxAstrolabeRuntimeEndpointDiscovery:

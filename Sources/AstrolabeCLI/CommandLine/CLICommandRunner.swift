@@ -9,6 +9,7 @@ import Foundation
 
 package struct CLICommandRunner {
     private let commandHandlers: [String: any CLICommandHandling]
+    private let closeHandler: () -> Void
 
     package init(
         platformModules: [HostPlatformModule]
@@ -53,7 +54,8 @@ package struct CLICommandRunner {
             ),
             visualDiffIssueInterpreter: HostPlatformVisualDiffIssueInterpreter(
                 registry: registry
-            )
+            ),
+            closeHandler: registry.close
         )
     }
 
@@ -84,7 +86,8 @@ package struct CLICommandRunner {
             namedMaskResolvers: namedMaskResolvers,
             nodeDetailSemanticMapper: PlatformNeutralNodeDetailAttributeSemanticMapper(),
             nodeDetailIssueInterpreter: PlatformNeutralNodeDetailSemanticIssueInterpreter(),
-            visualDiffIssueInterpreter: PlatformNeutralVisualDiffIssueInterpreter()
+            visualDiffIssueInterpreter: PlatformNeutralVisualDiffIssueInterpreter(),
+            closeHandler: {}
         )
     }
 
@@ -110,7 +113,8 @@ package struct CLICommandRunner {
         nodeDetailIssueInterpreter: any NodeDetailSemanticIssueInterpreting =
             PlatformNeutralNodeDetailSemanticIssueInterpreter(),
         visualDiffIssueInterpreter: any VisualDiffIssueInterpreting =
-            PlatformNeutralVisualDiffIssueInterpreter()
+            PlatformNeutralVisualDiffIssueInterpreter(),
+        closeHandler: @escaping () -> Void = {}
     ) {
         let resolvedService = SemanticRoleAnnotatingRuntimeUIInspector(
             base: service,
@@ -209,6 +213,11 @@ package struct CLICommandRunner {
             }
         }
         self.commandHandlers = commandHandlers
+        self.closeHandler = closeHandler
+    }
+
+    package func close() {
+        closeHandler()
     }
 
     func run(arguments: [String]) throws -> CLICommandOutput {
@@ -220,6 +229,14 @@ package struct CLICommandRunner {
             throw CLIError.unsupportedCommand(command)
         }
         return try handler.run(command: command, arguments: arguments)
+    }
+
+    package func runJSON(arguments: [String]) throws -> [String: Any] {
+        let output = try run(arguments: arguments)
+        guard case .jsonObject(let object) = output else {
+            throw CLIError.commandFailed("Command does not produce a JSON object")
+        }
+        return object
     }
 
     package func runAndPrint(arguments: [String]) -> Int32 {

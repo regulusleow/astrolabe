@@ -25,6 +25,13 @@ package struct ScreenInspectionFrame {
     /// Frame height.
     package let height: Double
 
+    package init(x: Double, y: Double, width: Double, height: Double) {
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+    }
+
     package func isNearlyEqual(to other: ScreenInspectionFrame, tolerance: Double = 0.5) -> Bool {
         abs(x - other.x) <= tolerance
             && abs(y - other.y) <= tolerance
@@ -48,6 +55,20 @@ package struct ScreenInspectionTargetEligibilityContext {
 
     /// Whether the node contains displayable text.
     package let hasText: Bool
+
+    package init(
+        className: String,
+        semanticRoles: Set<NodeSemanticRole>,
+        frame: ScreenInspectionFrame,
+        screenFrame: ScreenInspectionFrame?,
+        hasText: Bool
+    ) {
+        self.className = className
+        self.semanticRoles = semanticRoles
+        self.frame = frame
+        self.screenFrame = screenFrame
+        self.hasText = hasText
+    }
 }
 
 package protocol ScreenInspectionTargetQualityEvaluating {

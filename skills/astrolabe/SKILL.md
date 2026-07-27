@@ -118,8 +118,9 @@ a UI is correct from source inspection alone when an inspectable App is running.
      `snapshotId`. Do not claim that a screenshot taken after navigation is
      pixel-synchronized with an older hierarchy snapshot.
    - Use node attributes for exact logical values such as frames, spacing, font
-     size, colors, and corner radius. On iOS, logical geometry maps to points;
-     do not generalize that platform mapping to every Runtime.
+     size, colors, and corner radius. On iOS, logical geometry maps to points.
+     On Android View, it maps to density-independent pixels after Runtime
+     density normalization.
    - Use `compare_screenshot` when an expected PNG exists and pixel-level pass
      or fail is sufficient.
    - Use `inspect_diff` when the AI must explain mismatch regions, correlate
@@ -215,20 +216,29 @@ Patches are not implementation and must never be reported as a completed fix.
 1. Confirm the App advertises both `attributePatchDiscovery` and
    `attributePatching`.
 2. Call `list_patchable_attributes` and select an advertised
-   `attributePattern` whose `targetTypes` match the target node.
-3. Locate the latest node and inspect the exact semantic attribute path. For a
+   `attributePattern` whose `targetRoles` match the target node. An empty
+   `targetRoles` list means the attribute can target any compatible node role.
+3. Refresh the hierarchy, locate the latest node, and inspect the exact semantic
+   attribute path. Patch calls target live Runtime objects and do not read a
+   frozen hierarchy snapshot. For a
    parameterized pattern, replace `<identifier>` with the concrete identifier
    returned by node details.
 4. Encode the value according to `valueType`, `valueConstraints`, and
-   `acceptedFormats`; never infer an unadvertised property or format.
+   `acceptedFormats`; never infer an unadvertised property or format. Use exact
+   casing for catalog `allowedValues`. When a measurement advertises exactly one
+   accepted format, provide its numeric magnitude and let the Host encode the
+   catalog unit.
 5. Apply one testable hypothesis with `apply_attribute_patch`.
-6. Confirm `actualValue`, re-read node details, and capture or compare a
-   screenshot when visual evidence is relevant.
-7. If disproved, revert the patch. If confirmed, translate it into a source
+6. Confirm `actualValue`, then use `list_attribute_patches` to verify the active
+   state. Applying the same node and attribute again replaces that patch while
+   preserving its first original value and patch identifier.
+7. Re-read live node details and capture or compare a screenshot when visual
+   evidence is relevant.
+8. If disproved, revert the patch. If confirmed, translate it into a source
    change.
-8. Use `revert_attribute_patch` for one experiment or
+9. Use `revert_attribute_patch` for one experiment or
    `clear_attribute_patches` for all experiments.
-9. Rebuild or relaunch, obtain a new `appId`, and verify that the source-backed
+10. Rebuild or relaunch, obtain a new `appId`, and verify that the source-backed
    UI passes with `patchCount == 0`.
 
 Treat the Runtime catalog as the only source of truth for supported paths.
@@ -260,7 +270,8 @@ When a node cannot be found:
 
 - Runtime frames and spacing declare `unit: "logical"`; screenshot dimensions
   and ignore regions declare pixel units. Convert only with the reported
-  logical-to-pixel scale. On iOS, logical units correspond to points.
+  logical-to-pixel scale. On iOS, logical units correspond to points; on
+  Android View, they correspond to density-independent pixels.
 - A hierarchy `snapshotId` freezes node identity, structure, geometry, and
   basic attributes for up to five minutes. Local quota eviction can shorten
   that lifetime. It does not freeze the device screen.

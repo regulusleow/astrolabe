@@ -1,14 +1,19 @@
 # Astrolabe
 
+English | [简体中文](README.zh-CN.md)
+
 Astrolabe is a runtime UI inspection tool for AI coding agents. It combines a
-Swift CLI, a local MCP server, and a packaged Codex skill to inspect and verify
+Swift CLI, a local MCP server, and a packaged agent skill to inspect and verify
 running mobile interfaces.
+
+Android View inspection is supported through Astrolabe Runtime for Android 2.0.
 
 ## Features
 
-- Discover supported apps running in iOS simulators or on paired USB devices.
-- Inspect UI hierarchies, node frames, visibility, text, styles, semantic roles,
-  and detailed runtime attributes.
+- Discover supported apps running in iOS simulators, Android emulators, or on
+  USB-connected devices.
+- Inspect UIKit and Android View hierarchies, node frames, visibility, text,
+  styles, semantic roles, and detailed runtime attributes.
 - Capture native-resolution screenshots and compare them with expected images
   or recorded baselines.
 - Query nodes and verify style, layout, and node-detail expectations.
@@ -23,24 +28,36 @@ running mobile interfaces.
 - macOS 13 or later
 - Swift 5.9 or later
 - Node.js 22 or later
+- Android Platform Tools (ADB) when inspecting Android apps
 - A supported app with an Astrolabe Runtime SDK enabled in Debug builds
 
 ## Installation
 
-Clone the repository and install Astrolabe for Codex:
+Clone the repository, then install Astrolabe for the AI clients you use:
 
 ```bash
 git clone https://github.com/regulusleow/astrolabe.git
 cd astrolabe
 npm run install:codex
+npm run install:opencode
+npm run install:claude-code
 ```
 
-The installer builds the CLI and MCP adapter, installs the package under
-`~/.astrolabe/package`, links the bundled skill into
-`~/.agents/skills/astrolabe`, and updates the managed Astrolabe sections in
-`~/.codex/config.toml`.
+Codex, OpenCode, and Claude Code can be installed independently or together. A
+multi-client installation builds the shared package once:
 
-Restart Codex or open a new Codex session after installation.
+```bash
+node scripts/install.mjs --client codex --client opencode --client claude-code
+```
+
+The installer places shared artifacts under `~/.astrolabe/package` and links
+the bundled skill into each client's supported user-level skill directory.
+Each client adapter owns only its MCP configuration: Codex uses
+`~/.codex/config.toml`, OpenCode uses `~/.config/opencode/opencode.json`, and
+Claude Code uses `~/.claude.json`. Installing or uninstalling one client does
+not remove another client's configuration or required skill link.
+
+Restart the configured AI clients after installation.
 
 Installation management commands:
 
@@ -49,6 +66,16 @@ npm run reinstall:codex
 npm run update:codex
 npm run check:codex
 npm run uninstall:codex
+
+npm run reinstall:opencode
+npm run update:opencode
+npm run check:opencode
+npm run uninstall:opencode
+
+npm run reinstall:claude-code
+npm run update:claude-code
+npm run check:claude-code
+npm run uninstall:claude-code
 ```
 
 ## Quick Start
@@ -74,10 +101,10 @@ Hierarchy commands return a `snapshotId`. Pass it to subsequent hierarchy,
 node, style, and layout commands to keep the workflow bound to the captured
 page. Screenshot and visual comparison commands always use the latest screen.
 
-The installed MCP server exposes the same capabilities to Codex. The bundled
-skill guides app discovery, snapshot reuse, node selection, runtime checks,
-screenshots, visual comparison, and temporary presentation experiments.
-Codex is currently the only officially supported AI coding platform.
+The installed MCP server exposes the same capabilities to Codex, OpenCode, and
+Claude Code. The bundled skill guides app discovery, snapshot reuse, node
+selection, runtime checks, screenshots, visual comparison, and temporary
+presentation experiments.
 
 ## Development
 
@@ -106,16 +133,19 @@ npm run test:usb
 ## Repositories
 
 - [astrolabe-protocol](https://github.com/regulusleow/astrolabe-protocol):
-  platform-neutral Wire Protocol, Schemas, Fixtures, and Swift DTOs.
+  platform-neutral Wire Protocol, Schemas, Fixtures, and Swift/Kotlin DTOs and
+  Codecs.
 - [astrolabe-runtime-ios](https://github.com/regulusleow/astrolabe-runtime-ios):
   Debug-only UIKit Runtime SDK.
+- [astrolabe-runtime-android](https://github.com/regulusleow/astrolabe-runtime-android):
+  Debug-only Android View Runtime SDK.
 
 Astrolabe Host consumes the shared protocol directly and does not depend on a
 platform Runtime implementation package.
 
 ## Roadmap
 
-- Android Runtime and Host support.
+- Jetpack Compose Runtime inspection.
 - Integrations for additional AI coding platforms.
 
 ## License

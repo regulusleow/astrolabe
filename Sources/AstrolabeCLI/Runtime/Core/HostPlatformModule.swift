@@ -60,6 +60,9 @@ package struct HostPlatformModule {
     /// Routing capability that determines whether this module can handle an appId.
     let providerTargeting: any RuntimeUIProviderTargeting
 
+    /// Optional lifecycle capability used to release platform-owned resources.
+    let providerLifecycle: (any RuntimeUIProviderLifecycle)?
+
     /// Optional app discovery capability.
     let applicationDiscovery: (any RuntimeApplicationDiscovering)?
 
@@ -255,6 +258,7 @@ package struct HostPlatformModuleBuilder {
         return HostPlatformModule(
             providerDescriptor: provider.descriptor,
             providerTargeting: provider,
+            providerLifecycle: provider as? any RuntimeUIProviderLifecycle,
             applicationDiscovery: applicationDiscoveryProvider,
             appDiscoveryDiagnostics: appDiscoveryDiagnosticProvider,
             hierarchyCapture: hierarchyCaptureProvider,

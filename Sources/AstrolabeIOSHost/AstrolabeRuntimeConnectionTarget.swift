@@ -8,6 +8,7 @@
 import AstrolabeCLI
 import AstrolabeIOSDeviceSupport
 import AstrolabeProtocol
+import AstrolabeRuntimeHostCore
 import Foundation
 
 enum AstrolabeIOSRuntimePortDefaults {
@@ -16,20 +17,6 @@ enum AstrolabeIOSRuntimePortDefaults {
 
     /// Default forwarded port range for physical USB Runtimes.
     static let deviceRange: ClosedRange<UInt16> = 47_210...47_219
-}
-
-struct AstrolabeRuntimeEndpoint: Hashable {
-    /// Runtime connection type, such as simulator or usb.
-    let connectionKind: String
-
-    /// Identifier of the device hosting the Runtime.
-    let deviceId: String
-
-    /// Address used by the Host to connect to the Runtime.
-    let host: String
-
-    /// Port used by the Host to connect to the Runtime.
-    let port: UInt16
 }
 
 struct AstrolabeRuntimeAppID: Hashable {

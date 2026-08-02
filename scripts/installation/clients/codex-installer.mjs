@@ -15,14 +15,14 @@ export class CodexInstaller {
   constructor({
     configPath,
     serverName,
-    packagePaths,
+    distributionPaths,
     skillDirectories,
     dryRun
   }) {
     this.id = "codex";
     this.configPath = configPath;
     this.serverName = serverName;
-    this.packagePaths = packagePaths;
+    this.distributionPaths = distributionPaths;
     this.skillDirectories = skillDirectories;
     this.dryRun = dryRun;
   }
@@ -59,17 +59,17 @@ export class CodexInstaller {
     }
     const configText = readFileSync(this.configPath, "utf8");
     const problems = [];
-    if (!hasCodexServerConfig(configText, this.serverName)) {
+    const serverSection = codexServerSection(configText, this.serverName);
+    if (!serverSection) {
       problems.push(`Codex configuration is missing [mcp_servers.${this.serverName}]`);
-    }
-    if (!configText.includes(this.packagePaths.mcpEntryPath)) {
-      problems.push(`Codex configuration does not point to the MCP adapter: ${this.packagePaths.mcpEntryPath}`);
-    }
-    if (!configText.includes(this.packagePaths.inspectorBinPath)) {
-      problems.push(`Codex configuration does not point to the CLI binary: ${this.packagePaths.inspectorBinPath}`);
+    } else if (!codexSectionUsesLauncher(
+      serverSection,
+      this.distributionPaths.publicLauncherPath
+    )) {
+      problems.push(`Codex configuration does not use the managed MCP launcher: ${this.distributionPaths.publicLauncherPath}`);
     }
     const skillPaths = [
-      this.packagePaths.skillPath,
+      this.distributionPaths.skillPath,
       ...this.skillDirectories.map((directory) => join(directory, "SKILL.md"))
     ];
     if (skillPaths.some((skillPath) => configText.includes(skillPath))) {
@@ -86,7 +86,7 @@ export class CodexInstaller {
   }
 
   #removeLegacySkillEntries(configText) {
-    let result = removeCodexSkillConfig(configText, this.packagePaths.skillPath);
+    let result = removeCodexSkillConfig(configText, this.distributionPaths.skillPath);
     for (const skillDirectory of this.skillDirectories) {
       result = removeCodexSkillConfig(result, join(skillDirectory, "SKILL.md"));
     }
@@ -96,27 +96,22 @@ export class CodexInstaller {
   #serverConfig() {
     return {
       serverName: this.serverName,
-      mcpEntryPath: this.packagePaths.mcpEntryPath,
-      inspectorBinPath: this.packagePaths.inspectorBinPath
+      launcherPath: this.distributionPaths.publicLauncherPath
     };
   }
 }
 
 export function renderCodexServerConfig({
   serverName,
-  mcpEntryPath,
-  inspectorBinPath
+  launcherPath
 }) {
   validateServerName(serverName);
   return [
     `[mcp_servers.${serverName}]`,
-    `command = "node"`,
-    `args = [${tomlString(mcpEntryPath)}]`,
+    `command = ${tomlString(launcherPath)}`,
+    `args = ["mcp"]`,
     `startup_timeout_sec = 30`,
     `tool_timeout_sec = 120`,
-    ``,
-    `[mcp_servers.${serverName}.env]`,
-    `ASTROLABE_BIN = ${tomlString(inspectorBinPath)}`,
     ``
   ].join("\n");
 }
@@ -191,8 +186,35 @@ export function removeCodexSkillConfig(configText, skillPath) {
 }
 
 function hasCodexServerConfig(configText, serverName) {
+  return codexServerSection(configText, serverName) !== null;
+}
+
+function codexServerSection(configText, serverName) {
   const escapedName = serverName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^\\s*\\[mcp_servers\\.${escapedName}]\\s*$`, "m").test(configText);
+  const headingPattern = new RegExp(`^\\s*\\[mcp_servers\\.${escapedName}]\\s*$`);
+  const lines = configText.split(/\r?\n/);
+  const startIndex = lines.findIndex((line) => headingPattern.test(line));
+  if (startIndex < 0) {
+    return null;
+  }
+  const endOffset = lines.slice(startIndex + 1).findIndex((line) => /^\s*\[/.test(line));
+  const endIndex = endOffset < 0 ? lines.length : startIndex + 1 + endOffset;
+  return lines.slice(startIndex + 1, endIndex);
+}
+
+function codexSectionUsesLauncher(lines, launcherPath) {
+  const commandLine = lines.find((line) => /^\s*command\s*=/.test(line));
+  const argsLine = lines.find((line) => /^\s*args\s*=/.test(line));
+  try {
+    const command = JSON.parse(commandLine?.split("=").slice(1).join("=").trim() ?? "null");
+    const args = JSON.parse(argsLine?.split("=").slice(1).join("=").trim() ?? "null");
+    return command === launcherPath
+      && Array.isArray(args)
+      && args.length === 1
+      && args[0] === "mcp";
+  } catch {
+    return false;
+  }
 }
 
 function tomlString(value) {

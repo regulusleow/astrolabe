@@ -100,6 +100,23 @@ final class HostPlatformModuleTests: XCTestCase {
         XCTAssertEqual(result.data?.apps.map(\.appId), ["android:demo"])
     }
 
+    func testCommandRunnerReportsTheNativeHostVersion() throws {
+        let provider = DiscoveryOnlyProvider()
+        let module = try HostPlatformModuleBuilder(provider: provider)
+            .applicationDiscovery(provider)
+            .build()
+        let runner = try CLICommandRunner(platformModules: [module])
+
+        let output = try runner.run(arguments: ["version"])
+
+        guard case .jsonObject(let object) = output,
+              let data = object["data"] as? [String: Any] else {
+            return XCTFail("version should return a JSON object")
+        }
+        XCTAssertEqual(object["success"] as? Bool, true)
+        XCTAssertEqual(data["version"] as? String, AstrolabeHostMetadata.version)
+    }
+
     func testCommandRunnerClosesPlatformProviderResourcesExplicitly() throws {
         let provider = LifecycleProvider()
         let module = try HostPlatformModuleBuilder(provider: provider)

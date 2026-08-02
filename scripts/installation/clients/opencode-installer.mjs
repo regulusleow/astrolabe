@@ -9,10 +9,10 @@ import {
 } from "../jsonc-config-editor.mjs";
 import { writeManagedConfig } from "../managed-config-file.mjs";
 
-export function defaultOpenCodeConfigPath() {
-  return process.env.OPENCODE_CONFIG
-    ? expandHome(process.env.OPENCODE_CONFIG)
-    : join(homedir(), ".config", "opencode", "opencode.json");
+export function defaultOpenCodeConfigPath(environment = process.env, homeDirectory = homedir()) {
+  return environment.OPENCODE_CONFIG
+    ? expandHome(environment.OPENCODE_CONFIG, homeDirectory)
+    : join(homeDirectory, ".config", "opencode", "opencode.json");
 }
 
 const configurationName = "OpenCode";
@@ -22,14 +22,14 @@ export class OpenCodeInstaller {
   constructor({
     configPath,
     serverName,
-    packagePaths,
+    distributionPaths,
     skillDirectories,
     dryRun
   }) {
     this.id = "opencode";
     this.configPath = configPath;
     this.serverName = serverName;
-    this.packagePaths = packagePaths;
+    this.distributionPaths = distributionPaths;
     this.skillDirectories = skillDirectories;
     this.dryRun = dryRun;
   }
@@ -77,13 +77,10 @@ export class OpenCodeInstaller {
     if (
       !Array.isArray(entry.command)
       || entry.command.length !== 2
-      || entry.command[0] !== "node"
-      || entry.command[1] !== this.packagePaths.mcpEntryPath
+      || entry.command[0] !== this.distributionPaths.publicLauncherPath
+      || entry.command[1] !== "mcp"
     ) {
-      problems.push(`OpenCode configuration does not point to the MCP adapter: ${this.packagePaths.mcpEntryPath}`);
-    }
-    if (entry.environment?.ASTROLABE_BIN !== this.packagePaths.inspectorBinPath) {
-      problems.push(`OpenCode configuration does not point to the CLI binary: ${this.packagePaths.inspectorBinPath}`);
+      problems.push(`OpenCode configuration does not use the managed MCP launcher: ${this.distributionPaths.publicLauncherPath}`);
     }
     if (entry.enabled !== true) {
       problems.push(`OpenCode MCP server must be enabled: ${this.serverName}`);
@@ -102,23 +99,18 @@ export class OpenCodeInstaller {
   #serverConfig() {
     return {
       serverName: this.serverName,
-      mcpEntryPath: this.packagePaths.mcpEntryPath,
-      inspectorBinPath: this.packagePaths.inspectorBinPath
+      launcherPath: this.distributionPaths.publicLauncherPath
     };
   }
 }
 
 export function renderOpenCodeServerConfig({
-  mcpEntryPath,
-  inspectorBinPath
+  launcherPath
 }) {
   return {
     type: "local",
-    command: ["node", mcpEntryPath],
+    command: [launcherPath, "mcp"],
     enabled: true,
-    environment: {
-      ASTROLABE_BIN: inspectorBinPath
-    },
     timeout: 120000
   };
 }
@@ -140,12 +132,12 @@ export function removeOpenCodeServerConfig(configText, serverName) {
   });
 }
 
-function expandHome(value) {
+function expandHome(value, homeDirectory) {
   if (value === "~") {
-    return homedir();
+    return homeDirectory;
   }
   if (value.startsWith("~/")) {
-    return join(homedir(), value.slice(2));
+    return join(homeDirectory, value.slice(2));
   }
   return value;
 }

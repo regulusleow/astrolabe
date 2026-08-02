@@ -50,7 +50,7 @@ multi-client installation builds the shared package once:
 node scripts/install.mjs --client codex --client opencode --client claude-code
 ```
 
-The installer places shared artifacts under `~/.astrolabe/package` and links
+The source installer builds a Distribution under `~/.astrolabe/distributions/source` and links
 the bundled skill into each client's supported user-level skill directory.
 Each client adapter owns only its MCP configuration: Codex uses
 `~/.codex/config.toml`, OpenCode uses `~/.config/opencode/opencode.json`, and
@@ -63,17 +63,14 @@ Installation management commands:
 
 ```bash
 npm run reinstall:codex
-npm run update:codex
 npm run check:codex
 npm run uninstall:codex
 
 npm run reinstall:opencode
-npm run update:opencode
 npm run check:opencode
 npm run uninstall:opencode
 
 npm run reinstall:claude-code
-npm run update:claude-code
 npm run check:claude-code
 npm run uninstall:claude-code
 ```

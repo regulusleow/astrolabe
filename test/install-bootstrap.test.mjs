@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -62,8 +64,11 @@ test("installer bootstrap does not hide dependency resolution failures", () => {
   );
 });
 
-test("source installer builds only for install and invokes the assembled launcher", () => {
+test("source installer builds only for install and invokes the assembled launcher", (context) => {
   const calls = [];
+  const sourceRoot = mkdtempSync(join(tmpdir(), "astrolabe-source-installer-"));
+  context.after(() => rmSync(sourceRoot, { recursive: true, force: true }));
+  writeFileSync(join(sourceRoot, "package.json"), '{"version":"9.8.7"}\n');
 
   const exitCode = runSourceInstaller([
     "--client",
@@ -71,7 +76,7 @@ test("source installer builds only for install and invokes the assembled launche
     "--package-dir",
     "/tmp/astrolabe-source-distribution"
   ], {
-    projectRoot,
+    projectRoot: sourceRoot,
     architecture: "arm64",
     ensureDependencies: () => calls.push({ type: "dependencies" }),
     buildDistribution: (options) => {
@@ -90,9 +95,9 @@ test("source installer builds only for install and invokes the assembled launche
     {
       type: "build",
       options: {
-        projectRoot,
+        projectRoot: sourceRoot,
         outputRoot: "/tmp/astrolabe-source-distribution",
-        version: "2.0.0",
+        version: "9.8.7",
         channel: "source",
         platform: "darwin",
         architecture: "arm64"

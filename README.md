@@ -33,7 +33,31 @@ Android View inspection is supported through Astrolabe Runtime for Android 2.0.
 
 ## Installation
 
-Clone the repository, then install Astrolabe for the AI clients you use:
+Install Astrolabe with Homebrew:
+
+```bash
+brew install regulusleow/tap/astrolabe
+```
+
+Configure Astrolabe for a specific AI client:
+
+```bash
+astrolabe install --client codex
+astrolabe install --client opencode
+astrolabe install --client claude-code
+```
+
+To configure every detected AI client at once:
+
+```bash
+astrolabe install --all-detected
+```
+
+Homebrew lifecycle operations do not modify AI-client configuration. Restart
+the configured AI clients after running `astrolabe install`.
+
+To install from source, clone the repository, then install Astrolabe for the AI
+clients you use:
 
 ```bash
 git clone https://github.com/regulusleow/astrolabe.git

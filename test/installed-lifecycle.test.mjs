@@ -46,6 +46,22 @@ test("installed launcher configures and removes Codex without source build comma
   }
 });
 
+test("installed launcher passes the active Homebrew native executable to MCP", () => {
+  const fixture = createInstalledLifecycleFixture();
+  try {
+    const initial = runLauncher(fixture, ["mcp"]);
+    assert.equal(initial.status, 0, initial.stderr);
+    assert.equal(initial.stdout.trim(), fixture.paths.nativeExecutablePath);
+
+    const upgradedNativeExecutablePath = fixture.simulateUpgrade();
+    const upgraded = runLauncher(fixture, ["mcp"]);
+    assert.equal(upgraded.status, 0, upgraded.stderr);
+    assert.equal(upgraded.stdout.trim(), upgradedNativeExecutablePath);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 function createInstalledLifecycleFixture() {
   const root = mkdtempSync(join(tmpdir(), "astrolabe-installed-lifecycle-"));
   const realRoot = realpathSync(root);
@@ -74,7 +90,10 @@ function createInstalledLifecycleFixture() {
   mkdirSync(join(projectRoot, "mcp-adapter", "dist"), { recursive: true });
   writeFileSync(join(projectRoot, ".build", "release", "astrolabe"), "native fixture\n");
   chmodSync(join(projectRoot, ".build", "release", "astrolabe"), 0o755);
-  writeFileSync(join(projectRoot, "mcp-adapter", "dist", "index.js"), "export {};\n");
+  writeFileSync(
+    join(projectRoot, "mcp-adapter", "dist", "index.js"),
+    "process.stdout.write(`${process.env.ASTROLABE_BIN ?? \"\"}\\n`);\n"
+  );
   writeFileSync(join(projectRoot, "mcp-adapter", "package.json"), "{\"type\":\"module\"}\n");
   writeFileSync(join(projectRoot, "mcp-adapter", "package-lock.json"), "{\"lockfileVersion\":3}\n");
   cpSync(join(repositoryRoot, "LICENSE"), join(projectRoot, "LICENSE"));
@@ -119,6 +138,7 @@ function createInstalledLifecycleFixture() {
       rmSync(optFormulaRoot);
       symlinkSync(upgradedFormulaRoot, optFormulaRoot);
       rmSync(formulaRoot, { recursive: true, force: true });
+      return join(upgradedFormulaRoot, "libexec", "libexec", "astrolabe-native");
     },
     cleanup() {
       rmSync(root, { recursive: true, force: true });

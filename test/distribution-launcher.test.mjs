@@ -39,7 +39,13 @@ test("launcher routes MCP through Node and native inspection through astrolabe-n
     {
       command: process.execPath,
       args: ["/pkg/libexec/mcp-adapter/dist/index.js"],
-      options: { stdio: "inherit" }
+      options: {
+        stdio: "inherit",
+        env: {
+          ...process.env,
+          ASTROLABE_BIN: "/pkg/libexec/astrolabe-native"
+        }
+      }
     },
     {
       command: "/pkg/libexec/astrolabe-native",

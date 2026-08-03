@@ -225,6 +225,18 @@ package struct CLICommandRunner {
             throw CLIError.missingCommand
         }
 
+        if command == "version" {
+            guard arguments.count == 1 else {
+                throw CLIError.invalidArgument("version does not accept arguments")
+            }
+            return .jsonObject([
+                "schemaVersion": CLIOutputSchema.currentVersion,
+                "command": "version",
+                "success": true,
+                "data": ["version": AstrolabeHostMetadata.version]
+            ])
+        }
+
         guard let handler = commandHandlers[command] else {
             throw CLIError.unsupportedCommand(command)
         }

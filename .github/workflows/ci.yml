@@ -86,16 +86,47 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
-      - name: Install Codex package in isolated paths
+      - name: Build Homebrew Distribution
         run: |
-          npm run install:codex -- \
-            --package-dir "$RUNNER_TEMP/astrolabe-package" \
-            --user-skill-dir "$RUNNER_TEMP/skills/astrolabe" \
-            --client-config "codex=$RUNNER_TEMP/codex/config.toml"
+          npm --prefix mcp-adapter run build
+          swift build -c release --product astrolabe
+          npm run distribution:assemble -- \
+            --output "$RUNNER_TEMP/homebrew/Cellar/astrolabe/2.0.0/libexec" \
+            --channel homebrew \
+            --architecture "$(uname -m)"
 
-      - name: Verify Codex installation
+      - name: Verify installed Homebrew lifecycle
         run: |
-          npm run check:codex -- \
-            --package-dir "$RUNNER_TEMP/astrolabe-package" \
-            --user-skill-dir "$RUNNER_TEMP/skills/astrolabe" \
-            --client-config "codex=$RUNNER_TEMP/codex/config.toml"
+          brew_prefix="$RUNNER_TEMP/homebrew"
+          formula_root="$brew_prefix/Cellar/astrolabe/2.0.0"
+          stable_launcher="$brew_prefix/bin/astrolabe"
+          test_home="$RUNNER_TEMP/home"
+          config_path="$test_home/.codex/config.toml"
+          skill_path="$test_home/.agents/skills/astrolabe"
+          trap_path="$RUNNER_TEMP/source-command-traps"
+
+          mkdir -p "$brew_prefix/opt" "$brew_prefix/bin" "$test_home" "$trap_path"
+          ln -s "$formula_root" "$brew_prefix/opt/astrolabe"
+          ln -s "$brew_prefix/opt/astrolabe/libexec/bin/astrolabe" "$stable_launcher"
+          for command in git npm swift tsc; do
+            printf '%s\n' '#!/bin/sh' 'echo "Unexpected source build command" >&2' 'exit 99' > "$trap_path/$command"
+            chmod +x "$trap_path/$command"
+          done
+
+          HOME="$test_home" PATH="$trap_path:$PATH" "$stable_launcher" install \
+            --client codex \
+            --user-skill-dir "$skill_path" \
+            --client-config "codex=$config_path"
+          HOME="$test_home" PATH="$trap_path:$PATH" "$stable_launcher" check \
+            --client codex \
+            --user-skill-dir "$skill_path" \
+            --client-config "codex=$config_path"
+          HOME="$test_home" PATH="$trap_path:$PATH" "$stable_launcher" doctor --verbose --json > "$RUNNER_TEMP/doctor.json"
+          node -e 'const report = require(process.argv[1]); if (!report.success) process.exit(1)' "$RUNNER_TEMP/doctor.json"
+          grep -F "command = \"$stable_launcher\"" "$config_path"
+          test "$(readlink "$skill_path")" = "$brew_prefix/opt/astrolabe/libexec/skills/astrolabe"
+          HOME="$test_home" PATH="$trap_path:$PATH" "$stable_launcher" uninstall \
+            --client codex \
+            --user-skill-dir "$skill_path" \
+            --client-config "codex=$config_path"
+          test ! -e "$skill_path"

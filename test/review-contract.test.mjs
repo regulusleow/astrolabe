@@ -110,28 +110,19 @@ test("AI client commands reuse the shared installer", async () => {
     rootPackage.scripts["reinstall:codex"],
     "node scripts/install.mjs --client codex"
   );
-  assert.equal(
-    rootPackage.scripts["update:codex"],
-    "node scripts/install.mjs --client codex --repo https://github.com/regulusleow/astrolabe.git"
-  );
+  assert.equal(rootPackage.scripts["update:codex"], undefined);
   assert.equal(
     rootPackage.scripts["reinstall:opencode"],
     "node scripts/install.mjs --client opencode"
   );
-  assert.equal(
-    rootPackage.scripts["update:opencode"],
-    "node scripts/install.mjs --client opencode --repo https://github.com/regulusleow/astrolabe.git"
-  );
+  assert.equal(rootPackage.scripts["update:opencode"], undefined);
   assert.equal(
     rootPackage.scripts["reinstall:claude-code"],
     "node scripts/install.mjs --client claude-code"
   );
-  assert.equal(
-    rootPackage.scripts["update:claude-code"],
-    "node scripts/install.mjs --client claude-code --repo https://github.com/regulusleow/astrolabe.git"
-  );
+  assert.equal(rootPackage.scripts["update:claude-code"], undefined);
   assert.match(readme, /npm run reinstall:codex/);
-  assert.match(readme, /npm run update:codex/);
+  assert.doesNotMatch(readme, /npm run update:codex/);
   assert.match(readme, /npm run install:opencode/);
   assert.match(readme, /npm run check:opencode/);
   assert.match(readme, /npm run install:claude-code/);

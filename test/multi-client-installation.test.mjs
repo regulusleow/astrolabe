@@ -27,8 +27,7 @@ test("OpenCode installer preserves JSONC comments and unrelated configuration", 
 
   const updated = upsertOpenCodeServerConfig(existing, {
     serverName: "astrolabe",
-    mcpEntryPath: "/tmp/astrolabe/mcp-adapter/dist/index.js",
-    inspectorBinPath: "/tmp/astrolabe/bin/astrolabe"
+    launcherPath: "/tmp/astrolabe/bin/astrolabe"
   });
 
   assert.match(updated, /\/\/ Keep the selected providers\./);
@@ -37,9 +36,10 @@ test("OpenCode installer preserves JSONC comments and unrelated configuration", 
   assert.match(updated, /"astrolabe"/);
   assert.match(updated, /"type": "local"/);
   assert.match(updated, /"command": \[/);
-  assert.match(updated, /"node"/);
+  assert.match(updated, /"\/tmp\/astrolabe\/bin\/astrolabe"/);
+  assert.match(updated, /"mcp"/);
   assert.match(updated, /"enabled": true/);
-  assert.match(updated, /"ASTROLABE_BIN": "\/tmp\/astrolabe\/bin\/astrolabe"/);
+  assert.doesNotMatch(updated, /ASTROLABE_BIN/);
 });
 
 test("OpenCode installer replaces and removes only its managed MCP entry", () => {
@@ -59,11 +59,11 @@ test("OpenCode installer replaces and removes only its managed MCP entry", () =>
 
   const updated = upsertOpenCodeServerConfig(existing, {
     serverName: "astrolabe",
-    mcpEntryPath: "/new/index.js",
-    inspectorBinPath: "/new/astrolabe"
+    launcherPath: "/new/astrolabe"
   });
   assert.doesNotMatch(updated, /\/old\/index\.js/);
-  assert.match(updated, /\/new\/index\.js/);
+  assert.match(updated, /\/new\/astrolabe/);
+  assert.match(updated, /"mcp"/);
   assert.match(updated, /"codegraph"/);
 
   const removed = removeOpenCodeServerConfig(updated, "astrolabe");
@@ -74,9 +74,8 @@ test("OpenCode installer replaces and removes only its managed MCP entry", () =>
 test("OpenCode installer configures, checks, and uninstalls one global MCP entry", () => {
   const root = mkdtempSync(join(tmpdir(), "astrolabe-opencode-test-"));
   const configPath = join(root, "opencode.json");
-  const packagePaths = {
-    mcpEntryPath: "/tmp/astrolabe/mcp-adapter/dist/index.js",
-    inspectorBinPath: "/tmp/astrolabe/bin/astrolabe"
+  const distributionPaths = {
+    publicLauncherPath: "/tmp/astrolabe/bin/astrolabe"
   };
   writeFileSync(configPath, `{
   // Existing user setting.
@@ -85,7 +84,7 @@ test("OpenCode installer configures, checks, and uninstalls one global MCP entry
   const installer = new OpenCodeInstaller({
     configPath,
     serverName: "astrolabe",
-    packagePaths,
+    distributionPaths,
     skillDirectories: ["/tmp/agents/skills/astrolabe"],
     dryRun: false
   });
@@ -121,9 +120,8 @@ test("OpenCode installer reports paths that do not match the installed package",
   const installer = new OpenCodeInstaller({
     configPath,
     serverName: "astrolabe",
-    packagePaths: {
-      mcpEntryPath: "/new/index.js",
-      inspectorBinPath: "/new/astrolabe"
+    distributionPaths: {
+      publicLauncherPath: "/new/astrolabe"
     },
     skillDirectories: [],
     dryRun: false
@@ -131,8 +129,7 @@ test("OpenCode installer reports paths that do not match the installed package",
 
   try {
     assert.deepEqual(installer.check(), [
-      "OpenCode configuration does not point to the MCP adapter: /new/index.js",
-      "OpenCode configuration does not point to the CLI binary: /new/astrolabe",
+      "OpenCode configuration does not use the managed MCP launcher: /new/astrolabe",
       "OpenCode MCP server must be enabled: astrolabe"
     ]);
   } finally {
@@ -144,8 +141,7 @@ test("OpenCode installer rejects a non-object mcp configuration", () => {
   assert.throws(
     () => upsertOpenCodeServerConfig(`{"mcp": false}\n`, {
       serverName: "astrolabe",
-      mcpEntryPath: "/new/index.js",
-      inspectorBinPath: "/new/astrolabe"
+      launcherPath: "/new/astrolabe"
     }),
     /OpenCode mcp configuration must be an object/
   );
@@ -249,9 +245,8 @@ test("OpenCode installer requires the exact managed local command", () => {
   const installer = new OpenCodeInstaller({
     configPath,
     serverName: "astrolabe",
-    packagePaths: {
-      mcpEntryPath: "/new/index.js",
-      inspectorBinPath: "/new/astrolabe"
+    distributionPaths: {
+      publicLauncherPath: "/new/astrolabe"
     },
     skillDirectories: [],
     dryRun: false
@@ -259,7 +254,7 @@ test("OpenCode installer requires the exact managed local command", () => {
 
   try {
     assert.deepEqual(installer.check(), [
-      "OpenCode configuration does not point to the MCP adapter: /new/index.js"
+      "OpenCode configuration does not use the managed MCP launcher: /new/astrolabe"
     ]);
   } finally {
     rmSync(root, { recursive: true, force: true });

@@ -2,7 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { parseInstallArgs } from "../scripts/installation/install-options.mjs";
-import { createAIClientRegistry } from "../scripts/installation/install-command.mjs";
+import {
+  createAIClientRegistry,
+  installationHelpText,
+  resolveLifecycleClientIDs
+} from "../scripts/installation/install-command.mjs";
+import { detectAIClients } from "../scripts/installation/ai-client-detector.mjs";
 import { defaultClaudeCodeSkillDirectory } from "../scripts/installation/clients/claude-code-installer.mjs";
 
 test("shared installer accepts multiple AI clients without duplicating them", () => {
@@ -13,14 +18,12 @@ test("shared installer accepts multiple AI clients without duplicating them", ()
     "opencode",
     "--client",
     "codex",
-    "--package-dir",
-    "/tmp/astrolabe-package",
     "--client-config",
     "codex=/tmp/codex/config.toml",
     "--client-config",
     "opencode=/tmp/opencode/opencode.json"
   ], {
-    projectRoot: "/local/project",
+    packageDir: "/tmp/astrolabe-package",
     userSkillDir: "/tmp/agents/skills/astrolabe"
   });
 
@@ -39,28 +42,103 @@ test("shared installer requires at least one explicit AI client", () => {
   );
 });
 
-test("shared installer rejects conflicting lifecycle actions", () => {
+test("all-detected selects only clients with a command or config location", () => {
+  assert.deepEqual(detectAIClients({
+    homeDirectory: "/Users/tester",
+    environment: { PATH: "/usr/bin" },
+    commandExists: (name) => name === "codex",
+    pathExists: (path) => path === "/Users/tester/.config/opencode"
+  }), ["codex", "opencode"]);
+});
+
+test("all-detected honors the OpenCode configuration override", () => {
+  assert.deepEqual(detectAIClients({
+    homeDirectory: "/Users/tester",
+    environment: {
+      PATH: "",
+      OPENCODE_CONFIG: "/private/config/opencode.json"
+    },
+    commandExists: () => false,
+    pathExists: (path) => path === "/private/config/opencode.json"
+  }), ["opencode"]);
+});
+
+test("shared installer accepts all-detected for install", () => {
+  const options = parseInstallArgs(["--all-detected"]);
+
+  assert.equal(options.clientSelection, "detected");
+  assert.deepEqual(options.clientIDs, []);
+});
+
+test("shared installer accepts all-configured for uninstall", () => {
+  const options = parseInstallArgs(["--all-configured"], { action: "uninstall" });
+
+  assert.equal(options.action, "uninstall");
+  assert.equal(options.clientSelection, "configured");
+});
+
+test("installation help documents every client selection mode", () => {
+  const help = installationHelpText();
+
+  assert.match(help, /install .*--all-detected/);
+  assert.match(help, /check .*--all-configured/);
+  assert.match(help, /uninstall .*--all-configured/);
+  assert.match(help, /--client-config/);
+});
+
+test("shared installer rejects mixed explicit and automatic selection", () => {
   assert.throws(
-    () => parseInstallArgs(["--client", "codex", "--check", "--uninstall"]),
-    /--check and --uninstall cannot be used together/
+    () => parseInstallArgs(["--client", "codex", "--all-detected"]),
+    /choose exactly one client selection mode/
   );
 });
 
-test("shared installer maps repository updates to the source checkout", () => {
-  const options = parseInstallArgs([
-    "--client",
-    "opencode",
-    "--repo",
-    "https://github.com/regulusleow/astrolabe.git",
-    "--install-dir",
-    "/tmp/astrolabe-source"
-  ], {
-    projectRoot: "/local/project"
-  });
+test("shared installer rejects selection modes incompatible with the action", () => {
+  assert.throws(
+    () => parseInstallArgs(["--all-configured"]),
+    /--all-configured is available only for check or uninstall/
+  );
+  assert.throws(
+    () => parseInstallArgs(["--all-detected"], { action: "uninstall" }),
+    /--all-detected is available only for install or check/
+  );
+});
 
-  assert.equal(options.repoUrl, "https://github.com/regulusleow/astrolabe.git");
-  assert.equal(options.installDir, "/tmp/astrolabe-source");
-  assert.equal(options.projectRoot, "/tmp/astrolabe-source");
+test("configured selection resolves only configured clients", () => {
+  const registry = {
+    all() {
+      return [
+        { id: "codex", isConfigured: () => true },
+        { id: "opencode", isConfigured: () => false },
+        { id: "claude-code", isConfigured: () => true }
+      ];
+    }
+  };
+
+  assert.deepEqual(resolveLifecycleClientIDs({
+    clientSelection: "configured",
+    clientIDs: []
+  }, registry, []), ["codex", "claude-code"]);
+});
+
+test("installed lifecycle action cannot be changed by an option", () => {
+  for (const actionOption of ["--check", "--uninstall"]) {
+    assert.throws(
+      () => parseInstallArgs(["--client", "codex", actionOption], { action: "install" }),
+      /unknown option/
+    );
+  }
+});
+
+test("installed lifecycle rejects source and package relocation options", () => {
+  for (const args of [
+    ["--client", "opencode", "--repo", "https://example.com/repo.git"],
+    ["--client", "opencode", "--git", "https://example.com/repo.git"],
+    ["--client", "opencode", "--install-dir", "/tmp/source"],
+    ["--client", "opencode", "--package-dir", "/tmp/package"]
+  ]) {
+    assert.throws(() => parseInstallArgs(args), /unknown option/);
+  }
 });
 
 test("shared installer rejects malformed client configuration overrides", () => {

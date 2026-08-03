@@ -1,9 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dirname, resolve } from "node:path";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { ensureInstallerDependencies } from "../scripts/install.mjs";
+import {
+  ensureInstallerDependencies,
+  runSourceInstaller
+} from "../scripts/install.mjs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -56,5 +61,86 @@ test("installer bootstrap does not hide dependency resolution failures", () => {
       runCommand: () => assert.fail("npm ci must not run for unrelated failures")
     }),
     /invalid package metadata/
+  );
+});
+
+test("source installer builds only for install and invokes the assembled launcher", (context) => {
+  const calls = [];
+  const sourceRoot = mkdtempSync(join(tmpdir(), "astrolabe-source-installer-"));
+  context.after(() => rmSync(sourceRoot, { recursive: true, force: true }));
+  writeFileSync(join(sourceRoot, "package.json"), '{"version":"9.8.7"}\n');
+
+  const exitCode = runSourceInstaller([
+    "--client",
+    "codex",
+    "--package-dir",
+    "/tmp/astrolabe-source-distribution"
+  ], {
+    projectRoot: sourceRoot,
+    architecture: "arm64",
+    ensureDependencies: () => calls.push({ type: "dependencies" }),
+    buildDistribution: (options) => {
+      calls.push({ type: "build", options });
+      return { root: options.outputRoot };
+    },
+    runLauncher: (launcherPath, args) => {
+      calls.push({ type: "launcher", launcherPath, args });
+      return 0;
+    }
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(calls, [
+    { type: "dependencies" },
+    {
+      type: "build",
+      options: {
+        projectRoot: sourceRoot,
+        outputRoot: "/tmp/astrolabe-source-distribution",
+        version: "9.8.7",
+        channel: "source",
+        platform: "darwin",
+        architecture: "arm64"
+      }
+    },
+    {
+      type: "launcher",
+      launcherPath: "/tmp/astrolabe-source-distribution/bin/astrolabe",
+      args: ["install", "--client", "codex"]
+    }
+  ]);
+});
+
+test("source installer check uses the existing Distribution without rebuilding", () => {
+  const calls = [];
+
+  const exitCode = runSourceInstaller([
+    "--client",
+    "codex",
+    "--check",
+    "--package-dir",
+    "/tmp/astrolabe-source-distribution"
+  ], {
+    projectRoot,
+    architecture: "arm64",
+    ensureDependencies: () => assert.fail("check must not install source dependencies"),
+    buildDistribution: () => assert.fail("check must not build a Distribution"),
+    runLauncher: (launcherPath, args) => {
+      calls.push({ launcherPath, args });
+      return 0;
+    }
+  });
+
+  assert.equal(exitCode, 0);
+  assert.deepEqual(calls, [{
+    launcherPath: "/tmp/astrolabe-source-distribution/bin/astrolabe",
+    args: ["check", "--client", "codex"]
+  }]);
+});
+
+test("source installer rejects removed Git source options", () => {
+  assert.throws(
+    () => runSourceInstaller(["--client", "codex", "--repo", "https://example.com/repo.git"]),
+    /source acquisition is outside the installer/
   );
 });

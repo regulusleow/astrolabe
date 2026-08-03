@@ -110,7 +110,7 @@ The protocol has three independent versions that must not be conflated:
 | --- | --- | --- |
 | Package version | `AstrolabeProtocol 2.0.0` | SwiftPM dependency and release |
 | Wire Protocol version | `2.0` | Runtime handshake and compatibility decisions |
-| Product version | `astrolabe 2.0.0`, `runtime-ios 2.0.0`, `runtime-android 2.0.0` | Independent Host and platform SDK releases |
+| Product version | `astrolabe 2.1.0`, `runtime-ios 2.0.0`, `runtime-android 2.0.0` | Independent Host and platform SDK releases |
 
 Host and the iOS Runtime use explicit semantic-version dependencies:
 

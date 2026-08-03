@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import {
   mkdtempSync,
   rmSync,
@@ -10,6 +11,17 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { readPackageVersion } from "../dist/package-metadata.js";
+
+test("MCP doctor probe loads the runtime and exits with its version", () => {
+  const result = spawnSync(process.execPath, ["dist/index.js", "--doctor-probe"], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+    timeout: 2000
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { version: "2.0.0" });
+});
 
 test("readPackageVersion reads a strict package release version", () => {
   const root = mkdtempSync(join(tmpdir(), "astrolabe-mcp-version-test-"));

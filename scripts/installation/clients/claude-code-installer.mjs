@@ -27,14 +27,14 @@ export class ClaudeCodeInstaller {
   constructor({
     configPath,
     serverName,
-    packagePaths,
+    distributionPaths,
     skillDirectories,
     dryRun
   }) {
     this.id = "claude-code";
     this.configPath = configPath;
     this.serverName = serverName;
-    this.packagePaths = packagePaths;
+    this.distributionPaths = distributionPaths;
     this.skillDirectories = skillDirectories;
     this.dryRun = dryRun;
   }
@@ -80,15 +80,12 @@ export class ClaudeCodeInstaller {
       problems.push(`Claude Code MCP server must use stdio transport: ${this.serverName}`);
     }
     if (
-      entry.command !== "node"
+      entry.command !== this.distributionPaths.publicLauncherPath
       || !Array.isArray(entry.args)
       || entry.args.length !== 1
-      || entry.args[0] !== this.packagePaths.mcpEntryPath
+      || entry.args[0] !== "mcp"
     ) {
       problems.push(`Claude Code configuration does not use the managed MCP command: ${this.serverName}`);
-    }
-    if (entry.env?.ASTROLABE_BIN !== this.packagePaths.inspectorBinPath) {
-      problems.push(`Claude Code configuration does not point to the CLI binary: ${this.packagePaths.inspectorBinPath}`);
     }
     return problems;
   }
@@ -104,23 +101,18 @@ export class ClaudeCodeInstaller {
   #serverConfig() {
     return {
       serverName: this.serverName,
-      mcpEntryPath: this.packagePaths.mcpEntryPath,
-      inspectorBinPath: this.packagePaths.inspectorBinPath
+      launcherPath: this.distributionPaths.publicLauncherPath
     };
   }
 }
 
 export function renderClaudeCodeServerConfig({
-  mcpEntryPath,
-  inspectorBinPath
+  launcherPath
 }) {
   return {
     type: "stdio",
-    command: "node",
-    args: [mcpEntryPath],
-    env: {
-      ASTROLABE_BIN: inspectorBinPath
-    }
+    command: launcherPath,
+    args: ["mcp"]
   };
 }
 

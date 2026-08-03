@@ -12,22 +12,21 @@
   "scripts": {
     "install:codex": "node scripts/install.mjs --client codex",
     "reinstall:codex": "node scripts/install.mjs --client codex",
-    "update:codex": "node scripts/install.mjs --client codex --repo https://github.com/regulusleow/astrolabe.git",
     "check:codex": "node scripts/install.mjs --client codex --check",
     "uninstall:codex": "node scripts/install.mjs --client codex --uninstall",
     "install:opencode": "node scripts/install.mjs --client opencode",
     "reinstall:opencode": "node scripts/install.mjs --client opencode",
-    "update:opencode": "node scripts/install.mjs --client opencode --repo https://github.com/regulusleow/astrolabe.git",
     "check:opencode": "node scripts/install.mjs --client opencode --check",
     "uninstall:opencode": "node scripts/install.mjs --client opencode --uninstall",
     "install:claude-code": "node scripts/install.mjs --client claude-code",
     "reinstall:claude-code": "node scripts/install.mjs --client claude-code",
-    "update:claude-code": "node scripts/install.mjs --client claude-code --repo https://github.com/regulusleow/astrolabe.git",
     "check:claude-code": "node scripts/install.mjs --client claude-code --check",
     "uninstall:claude-code": "node scripts/install.mjs --client claude-code --uninstall",
     "version:check": "node scripts/version-sync.mjs --check",
     "version:set": "node scripts/version-sync.mjs --set",
     "release:prepare": "node scripts/release-prepare.mjs",
+    "distribution:assemble": "node scripts/assemble-distribution.mjs",
+    "distribution:test": "node --test test/distribution-manifest.test.mjs test/distribution-launcher.test.mjs test/distribution-assembler.test.mjs test/doctor.test.mjs",
     "test": "npm run version:check && node --test test/*.test.mjs && npm --prefix mcp-adapter test",
     "test:unit": "node --test test/*.test.mjs",
     "test:smoke": "node scripts/smoke-test.mjs",
@@ -38,5 +37,8 @@
   },
   "dependencies": {
     "jsonc-parser": "^3.3.1"
+  },
+  "overrides": {
+    "@hono/node-server": "^2.0.5"
   }
 }

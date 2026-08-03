@@ -1,4 +1,7 @@
+import { accessSync, constants, existsSync } from "node:fs";
+
 import { AIClientRegistry } from "./ai-client-registry.mjs";
+import { detectAIClients } from "./ai-client-detector.mjs";
 import {
   ClaudeCodeInstaller,
   defaultClaudeCodeConfigPath,
@@ -12,19 +15,23 @@ import {
   installManagedSkillLink,
   removeManagedSkillLink
 } from "./managed-skill-link.mjs";
-import { packageArtifactPaths } from "./package-layout.mjs";
-import {
-  buildProject,
-  checkRuntimePackage,
-  ensureGitSource,
-  installRuntimePackage
-} from "./runtime-package-installer.mjs";
+import { distributionPaths } from "../distribution/distribution-layout.mjs";
+import { readDistributionManifest } from "../distribution/distribution-manifest.mjs";
+import { distributionValidationProblems } from "../distribution/distribution-verifier.mjs";
+import { parseInstallArgs } from "./install-options.mjs";
 
-export function createAIClientRegistry(options) {
-  const packagePaths = packageArtifactPaths(options.packageDir);
+export function createAIClientRegistry(options, { validateSelection = true } = {}) {
+  const installedPaths = distributionPaths(options.packageDir);
+  const publicPaths = distributionPaths(options.publicDistributionRoot);
+  const clientDistributionPaths = Object.freeze({
+    ...installedPaths,
+    publicLauncherPath: options.launcherPath,
+    skillDirectory: publicPaths.skillDirectory,
+    skillPath: publicPaths.skillPath
+  });
   const sharedClientOptions = {
     serverName: options.serverName,
-    packagePaths,
+    distributionPaths: clientDistributionPaths,
     dryRun: options.dryRun
   };
   const registry = new AIClientRegistry([
@@ -44,8 +51,29 @@ export function createAIClientRegistry(options) {
       configPath: options.clientConfigPaths["claude-code"] ?? defaultClaudeCodeConfigPath()
     })
   ]);
-  validateClientConfigOverrides(options, registry);
+  if (validateSelection) {
+    validateClientConfigOverrides(options, registry);
+  }
   return registry;
+}
+
+export function resolveLifecycleClientIDs(options, registry, detectedIDs) {
+  if (options.clientSelection === "explicit") {
+    return options.clientIDs;
+  }
+  if (options.clientSelection === "detected") {
+    if (detectedIDs.length === 0) {
+      throw new Error("Failed: no supported AI clients detected");
+    }
+    return detectedIDs;
+  }
+  const configuredIDs = registry.all()
+    .filter((client) => client.isConfigured())
+    .map((client) => client.id);
+  if (configuredIDs.length === 0) {
+    throw new Error("Failed: no configured AI clients found");
+  }
+  return configuredIDs;
 }
 
 function validateClientConfigOverrides(options, registry) {
@@ -59,52 +87,62 @@ function validateClientConfigOverrides(options, registry) {
 }
 
 export function printHelp() {
-  process.stdout.write(`Usage:
-  astrolabe-install --client <codex|opencode|claude-code> [--client <client>]
-  npm run install:codex
-  npm run install:opencode
-  npm run install:claude-code
+  process.stdout.write(installationHelpText());
+}
+
+export function installationHelpText() {
+  return `Usage:
+  astrolabe install (--client <client> [--client <client>] | --all-detected)
+  astrolabe check (--client <client> [--client <client>] | --all-detected | --all-configured)
+  astrolabe uninstall (--client <client> [--client <client>] | --all-configured)
 
 Options:
-  --client <name>             AI client to configure; repeat to install multiple clients
-  --repo, --git <url>         Clone or update a Git repository before installation
-  --install-dir <path>        Source checkout directory used with --repo
-  --package-dir <path>        Shared runtime package directory
+  --client <name>             Client: codex, opencode, or claude-code; repeat as needed
+  --all-detected              Select every detected client for install or check
+  --all-configured            Select every configured client for check or uninstall
   --user-skill-dir <path>     Shared agent-compatible Astrolabe skill link
   --client-config <id>=<path> Override one AI client's global configuration path
   --server-name <name>        MCP server name; defaults to astrolabe
-  --check                     Verify shared artifacts and selected client configurations
-  --uninstall                 Remove selected client configurations and unused skill links
   --dry-run                   Validate and print external commands without changing files
-`);
+  --help                      Show this help
+`;
 }
 
 export function executeInstallation(options) {
   if (options.help) {
     printHelp();
-    return;
+    return 0;
   }
 
-  const packagePaths = packageArtifactPaths(options.packageDir);
-  const registry = createAIClientRegistry(options);
-  runInstallation(options, {
+  const installedPaths = distributionPaths(options.packageDir);
+  const publicPaths = distributionPaths(options.publicDistributionRoot);
+  const registry = createAIClientRegistry(options, { validateSelection: false });
+  const clientIDs = resolveLifecycleClientIDs(
+    options,
+    registry,
+    options.clientSelection === "detected" ? detectAIClients() : []
+  );
+  const resolvedOptions = { ...options, clientIDs };
+  validateClientConfigOverrides(resolvedOptions, registry);
+  runInstallation(resolvedOptions, {
     registry,
     preparePackage() {
-      ensureGitSource(options);
-      buildProject(options);
-      installRuntimePackage(options);
+      const problems = distributionProblems(installedPaths);
+      if (problems.length > 0) {
+        throw new Error(`Failed: Distribution validation failed:\n${problems.join("\n")}`);
+      }
     },
     installSkillLink(skillDirectory) {
-      installManagedSkillLink(skillDirectory, packagePaths.skillDir, options.dryRun);
+      installManagedSkillLink(skillDirectory, publicPaths.skillDirectory, options.dryRun);
     },
     removeSkillLink(skillDirectory) {
-      removeManagedSkillLink(skillDirectory, packagePaths.skillDir, options.dryRun);
+      removeManagedSkillLink(skillDirectory, publicPaths.skillDirectory, options.dryRun);
     },
     checkSharedInstallation(skillDirectories) {
       return [
-        ...checkRuntimePackage(options.packageDir),
+        ...distributionProblems(installedPaths),
         ...skillDirectories.flatMap((skillDirectory) => (
-          checkManagedSkillLink(skillDirectory, packagePaths.skillDir)
+          checkManagedSkillLink(skillDirectory, publicPaths.skillDirectory)
         ))
       ];
     }
@@ -114,7 +152,44 @@ export function executeInstallation(options) {
     process.stdout.write("Dry run completed without changing files.\n");
     return;
   }
-  process.stdout.write(`${completionMessage(options.action)}: ${options.clientIDs.join(", ")}\n`);
+  process.stdout.write(`${completionMessage(options.action)}: ${clientIDs.join(", ")}\n`);
+  return 0;
+}
+
+function distributionProblems(paths) {
+  let manifest;
+  try {
+    manifest = readDistributionManifest(paths.root);
+  } catch (error) {
+    return [error instanceof Error ? error.message : String(error)];
+  }
+  return distributionValidationProblems({
+    paths,
+    manifest,
+    pathExists: existsSync,
+    isExecutable(path) {
+      try {
+        accessSync(path, constants.X_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  });
+}
+
+export function runInstalledClientCommand(command, args, {
+  distributionRoot,
+  publicLauncherPath,
+  publicDistributionRoot
+}) {
+  const options = parseInstallArgs(args, {
+    action: command,
+    packageDir: distributionRoot,
+    launcherPath: publicLauncherPath,
+    publicDistributionRoot
+  });
+  return executeInstallation(options);
 }
 
 function completionMessage(action) {

@@ -28,8 +28,7 @@ test("Claude Code installer preserves unrelated user state", () => {
 
   const updated = upsertClaudeCodeServerConfig(existing, {
     serverName: "astrolabe",
-    mcpEntryPath: "/tmp/astrolabe/index.js",
-    inspectorBinPath: "/tmp/astrolabe/bin/astrolabe"
+    launcherPath: "/tmp/astrolabe/bin/astrolabe"
   });
 
   assert.match(updated, /"firstStartTime": "2026-07-20T10:26:57\.753Z"/);
@@ -37,8 +36,9 @@ test("Claude Code installer preserves unrelated user state", () => {
   assert.match(updated, /"other"/);
   assert.match(updated, /"astrolabe"/);
   assert.match(updated, /"type": "stdio"/);
-  assert.match(updated, /"command": "node"/);
-  assert.match(updated, /"ASTROLABE_BIN": "\/tmp\/astrolabe\/bin\/astrolabe"/);
+  assert.match(updated, /"command": "\/tmp\/astrolabe\/bin\/astrolabe"/);
+  assert.match(updated, /"args": \[\s*"mcp"\s*]/);
+  assert.doesNotMatch(updated, /ASTROLABE_BIN/);
 });
 
 test("Claude Code installer replaces and removes only its MCP entry", () => {
@@ -59,11 +59,11 @@ test("Claude Code installer replaces and removes only its MCP entry", () => {
 
   const updated = upsertClaudeCodeServerConfig(existing, {
     serverName: "astrolabe",
-    mcpEntryPath: "/new/index.js",
-    inspectorBinPath: "/new/astrolabe"
+    launcherPath: "/new/astrolabe"
   });
   assert.doesNotMatch(updated, /\/old\/index\.js/);
-  assert.match(updated, /\/new\/index\.js/);
+  assert.match(updated, /\/new\/astrolabe/);
+  assert.match(updated, /"mcp"/);
   assert.match(updated, /"other"/);
 
   const removed = removeClaudeCodeServerConfig(updated, "astrolabe");
@@ -74,15 +74,14 @@ test("Claude Code installer replaces and removes only its MCP entry", () => {
 test("Claude Code installer configures, checks, and uninstalls one user MCP entry", () => {
   const root = mkdtempSync(join(tmpdir(), "astrolabe-claude-code-test-"));
   const configPath = join(root, ".claude.json");
-  const packagePaths = {
-    mcpEntryPath: "/tmp/astrolabe/mcp-adapter/dist/index.js",
-    inspectorBinPath: "/tmp/astrolabe/bin/astrolabe"
+  const distributionPaths = {
+    publicLauncherPath: "/tmp/astrolabe/bin/astrolabe"
   };
   writeFileSync(configPath, `{"projects":{"/tmp/example":{}}}\n`);
   const installer = new ClaudeCodeInstaller({
     configPath,
     serverName: "astrolabe",
-    packagePaths,
+    distributionPaths,
     skillDirectories: [join(root, ".claude", "skills", "astrolabe")],
     dryRun: false
   });
@@ -119,9 +118,8 @@ test("Claude Code installer requires the exact managed stdio command", () => {
   const installer = new ClaudeCodeInstaller({
     configPath,
     serverName: "astrolabe",
-    packagePaths: {
-      mcpEntryPath: "/new/index.js",
-      inspectorBinPath: "/new/astrolabe"
+    distributionPaths: {
+      publicLauncherPath: "/new/astrolabe"
     },
     skillDirectories: [],
     dryRun: false

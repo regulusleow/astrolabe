@@ -28,10 +28,23 @@ Android View 检查由 Astrolabe Android Runtime 2.0 提供支持。
 
 ## 安装
 
-使用 Homebrew 安装 Astrolabe，然后配置所有已检测到的 AI 客户端：
+使用 Homebrew 安装 Astrolabe：
 
 ```bash
 brew install regulusleow/tap/astrolabe
+```
+
+为指定 AI 客户端配置 Astrolabe：
+
+```bash
+astrolabe install --client codex
+astrolabe install --client opencode
+astrolabe install --client claude-code
+```
+
+如需一次配置所有已检测到的 AI 客户端：
+
+```bash
 astrolabe install --all-detected
 ```
 

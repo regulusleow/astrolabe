@@ -3,13 +3,14 @@
 ## 1. Decision
 
 The independent `astrolabe-protocol` repository is the single source of truth
-for communication between Astrolabe Host, the iOS Runtime, and the future
-Android Runtime.
+for communication between Astrolabe Host, the iOS Runtime, and the Android
+Runtime.
 
 This design is implemented. The former `AstrolabeRuntimeProtocol` moved out of
 `astrolabe-runtime-ios`, and Host no longer obtains protocol models through the
 iOS Runtime. Both `astrolabe` and `astrolabe-runtime-ios` directly pin the
-independent `AstrolabeProtocol 2.0.0` package.
+independent `AstrolabeProtocol 2.0.0` Swift package. The Android Runtime pins
+the matching `astrolabe-protocol-kotlin 2.0.0` artifact from Maven Central.
 
 After this separation, platform Runtime implementation changes no longer force
 Host dependency updates. Host and platform Runtimes update the protocol package
@@ -19,7 +20,7 @@ only when the wire contract changes.
 
 ```mermaid
 flowchart TB
-    Protocol[astrolabe-protocol<br/>Specification, Schemas, Fixtures, Swift Models]
+    Protocol[astrolabe-protocol<br/>Specification, Schemas, Fixtures, Swift and Kotlin Models]
     Host[astrolabe<br/>CLI, MCP, Host Transport]
     IOS[astrolabe-runtime-ios<br/>UIKit Runtime]
     Android[astrolabe-runtime-android<br/>Android Runtime]
@@ -28,7 +29,7 @@ flowchart TB
 
     Protocol --> Host
     Protocol --> IOS
-    Protocol -. Schemas and Fixtures .-> Android
+    Protocol --> Android
     IOS --> AppIOS
     Android --> AppAndroid
 ```
@@ -41,10 +42,10 @@ implementation, or product-layer code.
 
 | Repository | Responsibility | Excludes |
 | --- | --- | --- |
-| `astrolabe-protocol` | Wire protocol, DTOs, version negotiation, error models, Schemas, and Fixtures | UIKit, Android View, TCP listeners, usbmux, CLI, and MCP |
-| `astrolabe` | App discovery, Host transport, CLI, MCP, screenshots, and visual inspection | Platform UI collection implementations |
+| `astrolabe-protocol` | Wire protocol, Swift and Kotlin DTOs, version negotiation, error models, Schemas, and Fixtures | UIKit, Android View, transport listeners, device discovery, CLI, and MCP |
+| `astrolabe` | App discovery, iOS and Android Host Providers, Host transport, CLI, MCP, screenshots, and visual inspection | Platform Runtime UI collection implementations |
 | `astrolabe-runtime-ios` | iOS lifecycle, Runtime Server, and UIKit/CALayer collection | Host commands and cross-platform protocol definitions |
-| `astrolabe-runtime-android` | Android lifecycle, View/Compose collection, and Android transport | Swift models and Host commands |
+| `astrolabe-runtime-android` | Android lifecycle, Runtime Server, Android View collection, local-socket transport, and patch execution | Host commands, cross-platform protocol definitions, and Compose inspection |
 
 ## 4. Protocol Repository Layout
 
@@ -53,30 +54,38 @@ astrolabe-protocol/
 ├── Package.swift
 ├── Sources/
 │   └── AstrolabeProtocol/
-│       ├── RuntimeFrameCodec.swift
-│       ├── RuntimeRequest.swift
-│       ├── RuntimeResponse.swift
-│       ├── RuntimeHandshake.swift
-│       ├── RuntimeHierarchy.swift
-│       ├── RuntimeNodeDetail.swift
-│       └── other platform-neutral DTOs
+│       ├── Core/
+│       ├── Framing/
+│       ├── Inspection/
+│       ├── Messaging/
+│       ├── Negotiation/
+│       └── Patching/
 ├── Tests/
 │   └── AstrolabeProtocolTests/
+├── settings.gradle.kts
+├── AstrolabeProtocolKotlin/
+│   └── src/
+│       ├── main/kotlin/
+│       └── test/kotlin/
+├── PROTOCOL-2.0.md
 ├── Schemas/
-│   └── v1/
+│   ├── v1/
+│   └── v2/
 └── Fixtures/
-    └── v1/
+    ├── v1/
+    └── v2/
 ```
 
-The Swift product is consistently named `AstrolabeProtocol`. The initial
-migration included:
+The Swift product is named `AstrolabeProtocol`, and the Kotlin artifact is
+published as `io.github.regulusleow:astrolabe-protocol-kotlin`. The repository
+provides:
 
 - Length-prefixed frame codecs.
 - Requests, responses, methods, and stable error codes.
 - Handshakes, protocol version ranges, and capabilities.
 - Application, screen, and device-information DTOs.
 - Hierarchy, node, geometry, color, and node-detail DTOs.
-- JSON codec rules and cross-language test Fixtures.
+- Swift and Kotlin JSON codec rules and cross-language test Fixtures.
 
 The following do not belong in the protocol repository:
 
@@ -97,10 +106,12 @@ truth consists of three parts:
 3. `Fixtures/v1`: valid and invalid message samples with expected decoding
    results.
 
-The Swift package implements this contract for Swift. The Android Runtime will
-implement Kotlin models from the same Schemas and Fixtures and run the same
-compatibility samples in CI. Default Swift `Codable` behavior must not become
-an undocumented protocol rule.
+The Swift package and Kotlin artifact implement this contract in their
+respective languages. Both bindings run compatibility tests against the same
+Schemas and Fixtures in CI. The Android Runtime consumes the published Kotlin
+artifact instead of defining a second copy of the protocol models. Default
+Swift `Codable` or Kotlin serialization behavior must not become an
+undocumented protocol rule.
 
 ## 6. Versioning Strategy
 
@@ -108,11 +119,14 @@ The protocol has three independent versions that must not be conflated:
 
 | Version | Example | Purpose |
 | --- | --- | --- |
-| Package version | `AstrolabeProtocol 2.0.0` | SwiftPM dependency and release |
+| Package version | `AstrolabeProtocol 2.0.0`, `astrolabe-protocol-kotlin 2.0.0` | SwiftPM and Maven Central dependencies and releases |
 | Wire Protocol version | `2.0` | Runtime handshake and compatibility decisions |
-| Product version | `astrolabe 2.1.0`, `runtime-ios 2.0.0`, `runtime-android 2.0.0` | Independent Host and platform SDK releases |
+| Product version | Host 2.1.0 release snapshot: `astrolabe 2.1.0`, `runtime-ios 2.1.0`, `runtime-android 2.0.1` | Independent Host and platform SDK releases |
 
-Host and the iOS Runtime use explicit semantic-version dependencies:
+The product-version example is a release snapshot, not a lockstep versioning
+requirement.
+
+Host and the iOS Runtime use the same explicit semantic-version dependency:
 
 ```swift
 .package(
@@ -121,8 +135,10 @@ Host and the iOS Runtime use explicit semantic-version dependencies:
 )
 ```
 
-Consumers use `exact` so products cannot automatically resolve different,
-unverified protocol versions.
+The Android Runtime similarly pins
+`io.github.regulusleow:astrolabe-protocol-kotlin:2.0.0`. Consumers use exact
+versions so products cannot automatically resolve different, unverified
+protocol versions.
 
 Compatibility rules:
 
@@ -151,8 +167,8 @@ open-source package releases:
 - Host, iOS Runtime, and Android Runtime use 2.0 without V1 compatibility
   fields in current DTOs.
 
-Protocol 2.0 is a prerequisite for Android Runtime development. Android must
-not begin from V1 models that contain Apple-specific field semantics.
+Protocol 2.0 enabled the Android Runtime without carrying forward V1 models
+that contained Apple-specific field semantics.
 
 ### 6.2 Host Platform Boundary
 
@@ -177,19 +193,18 @@ Host uses a platform-decoupled boundary above Wire Protocol 2.0:
 Shared Host consumes only normalized Wire DTOs; the current module boundary
 does not require platform-specific protocol dependencies.
 
-Android Runtime and the Android Host Provider will implement the same Protocol
-2.0 contract without adding a compatibility layer around iOS attribute
-structures.
+The Android Runtime and Android Host Provider implement the same Protocol 2.0
+contract without a compatibility layer around iOS attribute structures.
 
 ## 7. Test Boundaries
 
 | Test | Owning Repository |
 | --- | --- |
-| DTO round trips, frame codecs, Schema validation, and Fixture validation | `astrolabe-protocol` |
+| Swift and Kotlin DTO round trips, frame codecs, Schema validation, and Fixture conformance | `astrolabe-protocol` |
 | Runtime Server routing, lifecycle, and UIKit collection | `astrolabe-runtime-ios` |
-| Host client, transport, Provider, and compatibility policies | `astrolabe` |
+| Runtime Server routing, lifecycle, Android View collection, and local-socket transport | `astrolabe-runtime-android` |
+| Host client, iOS and Android Providers, transport, and compatibility policies | `astrolabe` |
 | End-to-end tests between Host and a real Runtime Server | Dedicated integration suite or Runtime repository |
-| Kotlin-model compatibility with shared Fixtures | `astrolabe-runtime-android` |
 
 Standard Host test targets no longer depend on the complete
 `AstrolabeRuntime`. TCP integration tests that require a real Runtime Server
@@ -202,32 +217,37 @@ validates client behavior through protocol Fixtures and replaceable transports.
 | --- | --- |
 | Create the protocol repository and migrate Swift models, codecs, and protocol tests | Complete |
 | Preserve the V1 specification, Schemas, and Fixtures as release history | Complete; current machine contracts live under the 2.0 assets |
-| Prepare the `AstrolabeProtocol 2.0.0` open-source release | Ready for review |
+| Publish `AstrolabeProtocol 2.0.0` for SwiftPM and Maven Central | Complete |
 | Make Runtime depend on the independent protocol package and remove its local protocol target | Complete |
 | Make Host depend directly on the independent protocol package | Complete |
 | Remove the complete `AstrolabeRuntime` product dependency from Host tests | Complete |
-| Automate Protocol, Runtime, Host, and iOS Simulator validation | Complete |
-| Complete USB physical-device end-to-end regression | Complete for both CLI and MCP |
+| Implement and publish the Android View Runtime | Complete; Compose inspection is not supported |
+| Implement the Android Host Provider and ADB-based discovery | Complete |
+| Automate Protocol, both Runtime SDKs, and Host validation | Complete |
+| Complete iOS USB physical-device end-to-end regression | Complete for both CLI and MCP |
 | Design and implement platform-neutral Protocol 2.0 | Complete |
 | Complete the Host platform-boundary refactor | Complete |
 
-Release order must be `astrolabe-protocol`, `astrolabe-runtime-ios`, then
+Coordinated releases proceed in this order: `astrolabe-protocol`, public
+Protocol SwiftPM and Maven availability, `astrolabe-runtime-ios`,
+`astrolabe-runtime-android`, public Android Runtime Maven availability, then
 `astrolabe`. Protocol commits and tags must exist remotely before consumers
 reference a new version.
 
 The migration adds no dual-protocol adapter and does not duplicate models to
-preserve old interfaces. All three repositories switch to the new module in the
-same change set, preventing two long-lived sources of truth.
+preserve old interfaces. All four core repositories use the independent
+protocol module, preventing two long-lived sources of truth.
 
 ## 9. Acceptance Criteria
 
 - `astrolabe/Package.swift` no longer references `astrolabe-runtime-ios`.
 - iOS Runtime implementation changes do not modify Host `Package.resolved`.
-- Host and iOS Runtime pin the same `AstrolabeProtocol` version.
+- Host and iOS Runtime pin the same `AstrolabeProtocol` version, and Android
+  Runtime pins the matching `astrolabe-protocol-kotlin` version.
 - The Protocol repository imports no UIKit, AppKit, Network, or platform Runtime
   module.
-- Swift protocol models and future Kotlin models pass the same Fixtures.
+- Swift and Kotlin protocol models pass the same Fixtures.
 - Wire Protocol version negotiation explicitly rejects breaking protocol
   changes.
-- Existing Simulator and USB physical-device UI inspection capabilities remain
-  unchanged after migration.
+- Existing iOS Simulator, Android emulator, and USB physical-device UI
+  inspection capabilities remain unchanged after migration.

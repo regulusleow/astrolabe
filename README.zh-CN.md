@@ -28,7 +28,17 @@ Android View 检查由 Astrolabe Android Runtime 2.0 提供支持。
 
 ## 安装
 
-克隆仓库，然后为需要使用的 AI 客户端安装 Astrolabe：
+使用 Homebrew 安装 Astrolabe，然后配置所有已检测到的 AI 客户端：
+
+```bash
+brew install regulusleow/tap/astrolabe
+astrolabe install --all-detected
+```
+
+Homebrew 的安装、升级和卸载操作不会修改 AI 客户端配置。执行 `astrolabe install` 后，
+请重启已配置的 AI 客户端。
+
+如需从源码安装，请克隆仓库，然后为需要使用的 AI 客户端安装 Astrolabe：
 
 ```bash
 git clone https://github.com/regulusleow/astrolabe.git
@@ -44,8 +54,8 @@ Codex、OpenCode 和 Claude Code 可以单独安装，也可以一次安装。�
 node scripts/install.mjs --client codex --client opencode --client claude-code
 ```
 
-安装器会将共享产物放在 `~/.astrolabe/package`，并把配套 Skill 链接到各客户端支持的用户级
-Skill 目录。每个客户端适配器只管理自己的 MCP 配置：Codex 使用
+源码安装器会将共享产物放在 `~/.astrolabe/distributions/source`，并把配套 Skill 链接到各客户端
+支持的用户级 Skill 目录。每个客户端适配器只管理自己的 MCP 配置：Codex 使用
 `~/.codex/config.toml`，OpenCode 使用 `~/.config/opencode/opencode.json`，Claude Code
 使用 `~/.claude.json`。安装或卸载某个客户端不会删除其他客户端的配置或仍在使用的 Skill 链接。
 
@@ -55,17 +65,14 @@ Skill 目录。每个客户端适配器只管理自己的 MCP 配置：Codex 使
 
 ```bash
 npm run reinstall:codex
-npm run update:codex
 npm run check:codex
 npm run uninstall:codex
 
 npm run reinstall:opencode
-npm run update:opencode
 npm run check:opencode
 npm run uninstall:opencode
 
 npm run reinstall:claude-code
-npm run update:claude-code
 npm run check:claude-code
 npm run uninstall:claude-code
 ```

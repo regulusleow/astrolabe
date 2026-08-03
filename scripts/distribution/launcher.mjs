@@ -39,7 +39,7 @@ export const nativeCommandNames = new Set([
  * @typedef {Object} LauncherDependencies
  * @property {import("./distribution-layout.mjs").DistributionPaths} paths - Installed Distribution paths.
  * @property {{version: string}} manifest - Validated Distribution manifest.
- * @property {(command: string, args: string[], options: {stdio: "inherit"}) => {status: number|null, error?: Error}} spawn - Synchronous child runner.
+ * @property {(command: string, args: string[], options: {stdio: "inherit", env?: Record<string, string|undefined>}) => {status: number|null, error?: Error}} spawn - Synchronous child runner.
  * @property {{write: (value: string) => void}} stdout - Standard output writer.
  * @property {{write: (value: string) => void}} stderr - Standard error writer.
  * @property {(command: string, args: string[]) => Promise<number>} runManagement - AI-client lifecycle runner.
@@ -71,7 +71,11 @@ export async function runLauncher(argv, dependencies = defaultDependencies()) {
     return runChild(
       process.execPath,
       [dependencies.paths.mcpEntryPath, ...argv.slice(1)],
-      dependencies
+      dependencies,
+      {
+        ...process.env,
+        ASTROLABE_BIN: dependencies.paths.nativeExecutablePath
+      }
     );
   }
   if (nativeCommandNames.has(command)) {
@@ -83,8 +87,9 @@ export async function runLauncher(argv, dependencies = defaultDependencies()) {
   return 2;
 }
 
-function runChild(command, args, dependencies) {
-  const result = dependencies.spawn(command, args, { stdio: "inherit" });
+function runChild(command, args, dependencies, env) {
+  const options = env ? { stdio: "inherit", env } : { stdio: "inherit" };
+  const result = dependencies.spawn(command, args, options);
   if (typeof result.status === "number") {
     return result.status;
   }

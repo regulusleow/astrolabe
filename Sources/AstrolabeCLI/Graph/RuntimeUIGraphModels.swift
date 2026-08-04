@@ -12,6 +12,17 @@ enum RuntimeUIGraphNodeKind: String, Equatable {
     case layer
 }
 
+enum RuntimeUIGraphQueryLimits {
+    /// Allowed inclusive BFS-depth range.
+    static let maximumDepthRange = 1 ... 4
+
+    /// Allowed inclusive returned-node range.
+    static let nodeCountRange = 1 ... 100
+
+    /// Allowed inclusive returned-relation range.
+    static let relationCountRange = 1 ... 200
+}
+
 struct RuntimeUIGraphNodeInput: Equatable {
     /// Runtime node identifier scoped to the captured process.
     let identifier: RuntimeOpaqueIdentifier

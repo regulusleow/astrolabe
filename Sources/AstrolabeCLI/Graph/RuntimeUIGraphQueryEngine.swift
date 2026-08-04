@@ -146,9 +146,15 @@ struct RuntimeUIGraphQueryEngine {
         _ query: RuntimeUIGraphQuery
     ) throws {
         guard !query.relationTypes.isEmpty,
-              (1 ... 4).contains(query.maximumDepth),
-              (1 ... 100).contains(query.nodeLimit),
-              (1 ... 200).contains(query.relationLimit)
+              RuntimeUIGraphQueryLimits.maximumDepthRange.contains(
+                  query.maximumDepth
+              ),
+              RuntimeUIGraphQueryLimits.nodeCountRange.contains(
+                  query.nodeLimit
+              ),
+              RuntimeUIGraphQueryLimits.relationCountRange.contains(
+                  query.relationLimit
+              )
         else {
             throw RuntimeUIGraphError.invalidQuery
         }

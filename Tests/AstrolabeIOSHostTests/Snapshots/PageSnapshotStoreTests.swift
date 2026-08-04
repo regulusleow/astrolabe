@@ -78,6 +78,17 @@ final class PageSnapshotStoreTests: XCTestCase {
         ))
         XCTAssertEqual(loadedHierarchy.identifier, snapshotID)
         XCTAssertEqual(loadedHierarchy.platform, .ios)
+        XCTAssertEqual(
+            loadedHierarchy.hierarchy["runtimeCapabilities"] as? [String],
+            ["hierarchySnapshot", "uiGraphRelations"]
+        )
+        let relations = try XCTUnwrap(
+            loadedHierarchy.hierarchy["relations"] as? [[String: Any]]
+        )
+        XCTAssertEqual(relations.count, 1)
+        XCTAssertEqual(relations[0]["type"] as? String, "ios.view.backingLayer")
+        XCTAssertEqual(relations[0]["sourceNodeID"] as? String, "1")
+        XCTAssertEqual(relations[0]["targetNodeID"] as? String, "2")
         XCTAssertEqual(loadedDetail.oid, "node-2")
         XCTAssertEqual(loadedDetail.detail["requestedOid"] as? String, "node-2")
 
@@ -232,6 +243,13 @@ final class PageSnapshotStoreTests: XCTestCase {
         [
             "appId": "app-1",
             "snapshotId": snapshotID,
+            "runtimeCapabilities": ["hierarchySnapshot", "uiGraphRelations"],
+            "relations": [[
+                "type": "ios.view.backingLayer",
+                "sourceNodeID": "1",
+                "targetNodeID": "2",
+                "extensions": [:]
+            ]],
             "displayItems": [[
                 "oid": "2",
                 "detailOid": "2",

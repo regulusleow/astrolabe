@@ -20,9 +20,10 @@ package struct AstrolabeRuntimeResponseMapper {
         appInfo: RuntimeApplicationInfoPayload,
         snapshot: RuntimeHierarchySnapshotPayload
     ) -> [String: Any] {
-        [
+        var result: [String: Any] = [
             "appId": appID,
             "serverVersion": handshake.runtime.version,
+            "runtimeCapabilities": handshake.capabilities.map(\.rawValue),
             "snapshotId": snapshot.snapshotID.rawValue,
             "capturedAtUnixTime": snapshot.capturedAtUnixTime,
             "interfaceOrientation": snapshot.orientation,
@@ -32,6 +33,8 @@ package struct AstrolabeRuntimeResponseMapper {
                 nodeDictionary(node, depth: 0, siblingIndex: index)
             }
         ]
+        result["relations"] = snapshot.relations?.map(relationDictionary)
+        return result
     }
 
     package func nodeDetail(
@@ -236,6 +239,17 @@ package struct AstrolabeRuntimeResponseMapper {
             "requestedValue": attributeValueDictionary(patch.requestedValue),
             "actualValue": optionalAttributeValueDictionary(patch.actualValue),
             "appliedAtUnixTime": patch.appliedAtUnixTime
+        ]
+    }
+
+    private func relationDictionary(
+        _ relation: RuntimeNodeRelation
+    ) -> [String: Any] {
+        [
+            "type": relation.type.rawValue,
+            "sourceNodeID": relation.sourceNodeID.rawValue,
+            "targetNodeID": relation.targetNodeID.rawValue,
+            "extensions": relation.extensions.values.mapValues(valueMapper.jsonValue)
         ]
     }
 

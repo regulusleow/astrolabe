@@ -80,6 +80,21 @@ test("Astrolabe skill is platform-neutral and capability-driven", async () => {
   assert.doesNotMatch(skill, /`ios_[a-z_]+`|`android_[a-z_]+`/);
 });
 
+test("Astrolabe skill keeps UI graph inspection bounded to one frozen snapshot", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+
+  assert.match(skill, /uiGraphRelations/);
+  assert.match(
+    skill,
+    /capture_hierarchy[\s\S]*query_ui_graph[\s\S]*summarize_node_detail/
+  );
+  assert.match(skill, /truncationReasons/);
+  assert.match(skill, /frontierOids/);
+  assert.match(skill, /omittedFrontierCount/);
+  assert.match(skill, /same `appId` and `snapshotId`/);
+  assert.doesNotMatch(skill, /`ios_query_ui_graph`|`android_query_ui_graph`/);
+});
+
 test("public documentation advertises delivered Android View support", async () => {
   const readme = await readProjectFile("README.md");
   const skillMetadata = await readProjectFile(

@@ -68,7 +68,28 @@ a UI is correct from source inspection alone when an inspectable App is running.
      `hierarchyVisible` only to distinguish an otherwise displayable node that
      is outside the screen or clipped by an ancestor.
 
-4. Inspect the smallest useful data surface.
+4. Traverse UI relations only when hierarchy edges cannot answer the question.
+   - Require the App to advertise `uiGraphRelations`. If it does not, keep the
+     investigation read-only and report the missing capability.
+   - Follow `capture_hierarchy` → `query_ui_graph` →
+     `summarize_node_detail`: choose `rootOid` from the captured hierarchy, then
+     pass the same `appId` and `snapshotId` through graph traversal and detail
+     inspection. Graph queries never capture or refresh a hierarchy.
+   - Request only the exact namespaced `relationTypes` needed by the task. Treat
+     platform-specific relation names as scoped Runtime data, not as portable
+     assumptions or reasons to invent platform-specific Tool names.
+   - Use `outgoing` when following relations owned by the root, `incoming` when
+     locating owners of the root, and `both` only when the question requires
+     both directions.
+   - Keep traversal bounded. Read `truncated`, `truncationReasons`,
+     `frontierOids`, and `omittedFrontierCount` before deciding whether to
+     expand. Continue deliberately from a returned frontier on the same frozen
+     snapshot instead of requesting the whole graph.
+   - Inspect only relevant returned nodes with `summarize_node_detail`. If the
+     snapshot expires, capture a new hierarchy and restart the complete chain;
+     never combine nodes or relations from different snapshots.
+
+5. Inspect the smallest useful data surface.
    - Use `inspect_node` to find one node and obtain its details in one call.
    - Use `summarize_node_detail` for flattened, searchable semantic attributes.
      Pass `filter` when only font, color, layout, image, text, or another small
@@ -101,7 +122,7 @@ a UI is correct from source inspection alone when an inspectable App is running.
      Do not infer that `scaleAspectFit` is universally correct: centered,
      aspect-fill, resizable, or intentionally cropped content may be valid.
 
-5. Convert requirements into structured checks.
+6. Convert requirements into structured checks.
    - Use `check_node` for class, text, visibility, or exact frame checks.
    - Use `check_node_detail` for one semantic attribute.
    - Use `check_style` for a group of font, color, radius, border, shadow, or
@@ -112,7 +133,7 @@ a UI is correct from source inspection alone when an inspectable App is running.
      requirement directly. Use explicit tolerances only when the requirement
      allows them.
 
-6. Use screenshots as visual evidence, not as a replacement for node data.
+7. Use screenshots as visual evidence, not as a replacement for node data.
    - Use `capture_screenshot` with `source: "auto"` for visual review.
    - Screenshot tools always capture the latest screen and do not accept
      `snapshotId`. Do not claim that a screenshot taken after navigation is
@@ -128,7 +149,7 @@ a UI is correct from source inspection alone when an inspectable App is running.
    - Use `record_baseline` and `compare_baseline` for repeatable regression
      checks across source iterations.
 
-7. Iterate until the running UI passes.
+8. Iterate until the running UI passes.
    - After source changes, build and relaunch using the project workflow when
      permitted by the user and repository instructions.
    - Run `list_apps` again after every relaunch because `appId` can change.
@@ -144,6 +165,7 @@ a UI is correct from source inspection alone when an inspectable App is running.
 | Understand the current screen | `inspect_screen` | Use `summarize_hierarchy` for bounded lists |
 | Continue investigating one captured screen | Pass its `snapshotId` | Omit it only to capture the latest screen |
 | Export a bounded UI tree | `capture_hierarchy` | Set `maxDepth`; inspect truncation metadata |
+| Trace non-hierarchy UI relations | `query_ui_graph` | Require `uiGraphRelations`; inspect truncation metadata before expanding |
 | Find candidate nodes | `find_nodes` | Follow `nextCursor`; restart when the frozen snapshot expires |
 | Find and inspect one node | `inspect_node` | Use after uniqueness is established |
 | Read semantic properties | `summarize_node_detail` | Use `node_detail` for omitted raw structure |
@@ -170,6 +192,24 @@ a UI is correct from source inspection alone when an inspectable App is running.
 4. `summarize_node_detail` with the same `snapshotId` and a narrow filter
 5. `check_node`, `check_node_detail`, `check_style`, or `check_layout` with the same `snapshotId`
 6. `capture_screenshot` only when the latest visual context is useful
+
+### Trace A UI Relation
+
+1. `list_apps` and confirm `uiGraphRelations` is advertised.
+2. `capture_hierarchy` and retain its `snapshotId`.
+3. Select the root `oid` from that hierarchy.
+4. `query_ui_graph` with the same `appId` and `snapshotId`, the narrowest useful
+   `relationTypes`, and the direction required by the question.
+5. Read `truncated`, `truncationReasons`, `frontierOids`, and
+   `omittedFrontierCount`. Expand from a returned frontier only when the missing
+   branch matters to the investigation.
+6. Use `summarize_node_detail` on relevant returned nodes with the same frozen
+   snapshot, then report the exact relation path used as evidence.
+
+For a UIKit rendering investigation, a task-scoped example is
+`UIView --ios.view.backingLayer--> CALayer --tree.layerChild--> descendant
+CALayer`. Query those exact relation types in the `outgoing` direction. Do not
+assume that path exists on another platform or Runtime.
 
 ### Match a Design
 
@@ -298,6 +338,10 @@ When a node cannot be found:
 - Stale App or node: refresh App discovery and hierarchy.
 - Expired hierarchy snapshot: capture a new page snapshot and restart the
   workflow; do not combine new nodes with results from the expired snapshot.
+- Unsupported UI graph: report that `uiGraphRelations` is missing and do not
+  infer relations from platform implementation details.
+- Truncated UI graph: report `truncationReasons`, `frontierOids`, and
+  `omittedFrontierCount`; expand only the frontier required by the question.
 - Snapshot detail unavailable: report that the original Runtime object is no
   longer readable. Do not recapture the hierarchy and substitute a current
   node under the old `snapshotId`.
@@ -316,8 +360,10 @@ Report concise, reproducible evidence:
   advertised capabilities.
 - Hierarchy `snapshotId`, `hierarchySource`, and capture time.
 - Nodes inspected: class, text when available, `oid`, and frame.
-- Exact attributes or relations checked, expected values, actual values, and
-  tolerances.
+- Exact attributes or relation paths checked, including direction and relation
+  types, expected values, actual values, and tolerances.
+- UI graph truncation reasons, frontier OIDs, and omitted frontier count when a
+  graph result is incomplete.
 - Screenshot source, dimensions, scale, and diff result when used.
 - Active temporary patches, if any, clearly labeled as experiments.
 - Node-detail source and detail capture time when a frozen hierarchy was used.

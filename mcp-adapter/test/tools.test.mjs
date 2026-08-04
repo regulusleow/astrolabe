@@ -5,6 +5,7 @@ import { registerInspectorTools } from "../dist/tools.js";
 const expectedToolNames = [
   "list_apps",
   "capture_hierarchy",
+  "query_ui_graph",
   "capture_screenshot",
   "list_patchable_attributes",
   "apply_attribute_patch",
@@ -27,7 +28,7 @@ const expectedToolNames = [
   "check_layout"
 ].sort();
 
-test("MCP keeps the 22 platform-neutral tool names and advertises output envelopes", () => {
+test("MCP keeps the 23 platform-neutral tool names and advertises output envelopes", () => {
   const server = new FakeServer();
   registerInspectorTools(server, "/tmp/astrolabe", async () => successResult({}));
 
@@ -179,6 +180,126 @@ test("registerInspectorTools bounds capture_hierarchy output by default", async 
     }
   ]);
   assert.deepEqual(response.structuredContent.data, { root: { className: "UIView" } });
+});
+
+test("registerInspectorTools delegates required UI graph input without duplicating native defaults", async () => {
+  const server = new FakeServer();
+  const calls = [];
+  const snapshotId = "11111111-1111-1111-1111-111111111111";
+
+  registerInspectorTools(server, "/tmp/astrolabe", async (inspectorBin, args) => {
+    calls.push({ inspectorBin, args });
+    return successResult({ nodes: [{ oid: "view-A" }], relations: [] });
+  });
+
+  const response = await server.handlers.get("query_ui_graph")({
+    appId: "app-1",
+    snapshotId,
+    rootOid: "view-A",
+    relationTypes: ["ios.view.backingLayer"]
+  });
+
+  assert.deepEqual(calls, [
+    {
+      inspectorBin: "/tmp/astrolabe",
+      args: [
+        "query-ui-graph",
+        "app-1",
+        "--snapshot-id",
+        snapshotId,
+        "--root-oid",
+        "view-A",
+        "--relation",
+        "ios.view.backingLayer",
+        "--json"
+      ]
+    }
+  ]);
+  assert.deepEqual(response.structuredContent.data, {
+    nodes: [{ oid: "view-A" }],
+    relations: []
+  });
+});
+
+test("registerInspectorTools forwards every supplied UI graph bound in stable order", async () => {
+  const server = new FakeServer();
+  const calls = [];
+  const snapshotId = "11111111-1111-1111-1111-111111111111";
+
+  registerInspectorTools(server, "/tmp/astrolabe", async (inspectorBin, args) => {
+    calls.push({ inspectorBin, args });
+    return successResult({ truncated: true, truncationReasons: ["nodeLimit"] });
+  });
+
+  await server.handlers.get("query_ui_graph")({
+    appId: "app-1",
+    snapshotId,
+    rootOid: "layer-A",
+    relationTypes: ["ios.view.backingLayer", "tree.layerChild"],
+    direction: "both",
+    maxDepth: 4,
+    nodeLimit: 100,
+    relationLimit: 200,
+    byteLimit: 262144
+  });
+
+  assert.deepEqual(calls, [
+    {
+      inspectorBin: "/tmp/astrolabe",
+      args: [
+        "query-ui-graph",
+        "app-1",
+        "--snapshot-id",
+        snapshotId,
+        "--root-oid",
+        "layer-A",
+        "--relation",
+        "ios.view.backingLayer",
+        "--relation",
+        "tree.layerChild",
+        "--direction",
+        "both",
+        "--max-depth",
+        "4",
+        "--node-limit",
+        "100",
+        "--relation-limit",
+        "200",
+        "--byte-limit",
+        "262144",
+        "--json"
+      ]
+    }
+  ]);
+});
+
+test("query_ui_graph schema enforces frozen snapshot and native public bounds", () => {
+  const server = new FakeServer();
+  registerInspectorTools(server, "/tmp/astrolabe", async () => successResult({}));
+  const schema = server.configs.get("query_ui_graph").inputSchema;
+  const snapshotId = "11111111-1111-1111-1111-111111111111";
+
+  assert.equal(schema.snapshotId.parse(snapshotId), snapshotId);
+  assert.throws(() => schema.snapshotId.parse("latest"));
+  assert.equal(schema.rootOid.parse("node-A"), "node-A");
+  assert.throws(() => schema.rootOid.parse(""));
+  assert.deepEqual(
+    schema.relationTypes.parse(["ios.view.backingLayer"]),
+    ["ios.view.backingLayer"]
+  );
+  assert.throws(() => schema.relationTypes.parse([]));
+  assert.equal(schema.direction.parse("incoming"), "incoming");
+  assert.throws(() => schema.direction.parse("sideways"));
+
+  for (const [name, lowerOverflow, upperOverflow] of [
+    ["maxDepth", 0, 5],
+    ["nodeLimit", 0, 101],
+    ["relationLimit", 0, 201],
+    ["byteLimit", 1023, 262145]
+  ]) {
+    assert.throws(() => schema[name].parse(lowerOverflow));
+    assert.throws(() => schema[name].parse(upperOverflow));
+  }
 });
 
 test("registerInspectorTools wires capture_screenshot to the CLI command", async () => {

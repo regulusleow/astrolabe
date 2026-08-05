@@ -11,6 +11,35 @@ import XCTest
 @testable import AstrolabeCLI
 
 final class RuntimeUIGraphIndexBuilderTests: XCTestCase {
+    func testBuilderDerivesViewChildForAndroidHierarchy() throws {
+        let snapshot = makeSnapshot(
+            platform: .android,
+            roots: [
+                node(
+                    id: "android-root",
+                    className: "android.widget.LinearLayout",
+                    role: "window",
+                    kind: "view",
+                    children: [
+                        node(
+                            id: "android-label",
+                            className: "android.widget.TextView",
+                            role: "label",
+                            kind: "view"
+                        )
+                    ]
+                )
+            ],
+            relations: []
+        )
+
+        let index = try buildIndex(snapshot: snapshot)
+
+        XCTAssertEqual(index.relations.map(\.type.rawValue), ["tree.viewChild"])
+        XCTAssertEqual(index.relations.first?.sourceNodeID.rawValue, "android-root")
+        XCTAssertEqual(index.relations.first?.targetNodeID.rawValue, "android-label")
+    }
+
     func testBuilderIndexesCanonicalAndDerivedTreeRelations() throws {
         let index = try buildIndex(snapshot: makeSnapshot())
 
@@ -154,6 +183,7 @@ final class RuntimeUIGraphIndexBuilderTests: XCTestCase {
     }
 
     private func makeSnapshot(
+        platform: RuntimeUIPlatform = .ios,
         capabilities: [String] = ["hierarchySnapshot", "uiGraphRelations"],
         roots: [[String: Any]]? = nil,
         relations: [[String: Any]]? = nil,
@@ -173,7 +203,7 @@ final class RuntimeUIGraphIndexBuilderTests: XCTestCase {
             identifier: identifier,
             createdAt: Date(timeIntervalSince1970: 1_000),
             appId: "app-1",
-            platform: .ios,
+            platform: platform,
             hierarchy: hierarchy
         )
     }

@@ -211,6 +211,17 @@ For a UIKit rendering investigation, a task-scoped example is
 CALayer`. Query those exact relation types in the `outgoing` direction. Do not
 assume that path exists on another platform or Runtime.
 
+For a UIKit mask investigation, query `ios.view.backingLayer` and
+`ios.layer.mask` to follow
+`UIView --ios.view.backingLayer--> CALayer --ios.layer.mask--> CAShapeLayer`.
+The mask edge proves object ownership only; inspect node details separately for
+shape-path or fill-rule semantics when the Runtime exposes them.
+
+For an Android View hierarchy, query `tree.viewChild` to follow
+`ViewGroup --tree.viewChild--> View`. This edge is derived from the frozen
+authoritative hierarchy by the Host and does not require the Runtime to
+duplicate parent-child edges in its canonical `relations` array.
+
 ### Match a Design
 
 1. Inspect the screen and locate each important visible node.

@@ -95,6 +95,83 @@ test("Astrolabe skill keeps UI graph inspection bounded to one frozen snapshot",
   assert.doesNotMatch(skill, /`ios_query_ui_graph`|`android_query_ui_graph`/);
 });
 
+test("Astrolabe skill loads advanced inspection guidance progressively", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+
+  assert.ok(
+    skill.split("\n").length <= 260,
+    "core skill should stay bounded while advanced workflows live in references"
+  );
+  assert.match(skill, /references\/rendered-content\.md/);
+  assert.match(skill, /references\/ui-graph\.md/);
+  assert.match(skill, /references\/visual-regression\.md/);
+  assert.match(skill, /references\/temporary-patches\.md/);
+});
+
+test("Astrolabe skill separates rendered content from its layout container", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+  const guidance = await readProjectFile(
+    "skills/astrolabe/references/rendered-content.md"
+  ).catch(() => "");
+  const contract = `${skill}\n${guidance}`;
+
+  assert.match(contract, /layout box/i);
+  assert.match(contract, /rendered footprint/i);
+  assert.match(contract, /intrinsic content/i);
+  assert.match(contract, /mapping policy/i);
+  assert.match(contract, /clipping or masking/i);
+  assert.match(contract, /transform or visual effect/i);
+  assert.match(contract, /cannot produce `passed`/i);
+  assert.match(contract, /imageSize/);
+  assert.match(contract, /contentMode/);
+});
+
+test("Astrolabe skill distinguishes UI graph tool and Runtime failures", async () => {
+  const guidance = await readProjectFile(
+    "skills/astrolabe/references/ui-graph.md"
+  ).catch(() => "");
+
+  assert.match(guidance, /Tool is unavailable/i);
+  assert.match(guidance, /uiGraphRelations/);
+  assert.match(guidance, /invalid_ui_graph_snapshot/);
+  assert.match(guidance, /ui_graph_node_not_found/);
+  assert.match(guidance, /capture_hierarchy.*same `snapshotId`/is);
+});
+
+test("Astrolabe skill metadata covers rendered content and UI relations", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+  const metadata = await readProjectFile(
+    "skills/astrolabe/agents/openai.yaml"
+  );
+
+  assert.match(skill.slice(0, skill.indexOf("---", 4)), /rendered content/i);
+  assert.match(skill.slice(0, skill.indexOf("---", 4)), /UI relations/i);
+  assert.match(metadata, /rendered content/i);
+  assert.match(metadata, /UI relations/i);
+});
+
+test("Astrolabe skill does not treat node details as an atomic hierarchy snapshot", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+
+  assert.match(skill, /detailSource/);
+  assert.match(skill, /snapshotCache/);
+  assert.match(skill, /liveRuntime/);
+  assert.match(skill, /detailCapturedAtUnixTime/);
+  assert.match(skill, /not.*atomic|not.*same capture time/is);
+});
+
+test("Astrolabe skill rejects absence conclusions from a truncated hierarchy", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+
+  assert.match(skill, /summarize_hierarchy/);
+  assert.match(skill, /maxDepth/);
+  assert.match(skill, /nodeCount/);
+  assert.match(skill, /returnedNodeCount/);
+  assert.match(skill, /omittedNodeCount/);
+  assert.match(skill, /truncated/);
+  assert.match(skill, /not.*(?:absent|missing).*truncated/is);
+});
+
 test("public documentation advertises delivered Android View support", async () => {
   const readme = await readProjectFile("README.md");
   const skillMetadata = await readProjectFile(

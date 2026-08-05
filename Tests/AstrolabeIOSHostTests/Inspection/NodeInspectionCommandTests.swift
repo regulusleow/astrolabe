@@ -59,6 +59,7 @@ final class NodeInspectionCommandTests: XCTestCase {
                                 ],
                                 [
                                     "identifier": "backgroundColor",
+                                    "semanticPath": "ios.runtime.backgroundColor",
                                     "displayTitle": "Background",
                                     "attrTypeName": "color",
                                     "value": [1, 0, 0, 1]
@@ -93,6 +94,42 @@ final class NodeInspectionCommandTests: XCTestCase {
         XCTAssertEqual(colorRGBA["blue"] as? Int, 0)
         XCTAssertEqual(colorRGBA["alpha"] as? Double, 1)
         XCTAssertEqual(service.calls, [.fetchNodeDetail("app-1", "42")])
+    }
+
+    func testSummarizeNodeDetailPreservesRuntimeSemanticPathWithoutPlatformAlias() throws {
+        let service = Fixtures.FakeInspectorService()
+        service.detail = [
+            "attributeGroups": [
+                [
+                    "identifier": "ios.shapeLayer",
+                    "sections": [
+                        [
+                            "identifier": "properties",
+                            "attributes": [
+                                [
+                                    "identifier": "fillRule",
+                                    "semanticPath": "ios.shapeLayer.fillRule",
+                                    "displayTitle": "fillRule",
+                                    "attrTypeName": "string",
+                                    "value": "non-zero"
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let output = try Fixtures.makeRunner(service: service).run(arguments: ["summarize-node-detail", "app-1", "42"])
+
+        guard case .jsonObject(let object) = output else {
+            return XCTFail("summarize-node-detail should return jsonObject output")
+        }
+        let data = try XCTUnwrap(object["data"] as? [String: Any])
+        let attribute = try XCTUnwrap((data["attributes"] as? [[String: Any]])?.first)
+        XCTAssertEqual(attribute["semanticPath"] as? String, "ios.shapeLayer.fillRule")
+        XCTAssertNil(attribute["semanticName"])
+        XCTAssertNil(data["semanticAttributes"])
     }
 
     func testSummarizeNodeDetailFiltersAttributes() throws {
@@ -429,6 +466,49 @@ final class NodeInspectionCommandTests: XCTestCase {
         let data = try XCTUnwrap(object["data"] as? [String: Any])
         XCTAssertEqual(data["passed"] as? Bool, true)
         XCTAssertEqual((data["attribute"] as? [String: Any])?["semanticName"] as? String, "fontSize")
+        XCTAssertEqual(service.calls, [.fetchNodeDetail("app-1", "42")])
+    }
+
+    func testCheckNodeDetailPassesMatchingRuntimeSemanticPath() throws {
+        let service = Fixtures.FakeInspectorService()
+        service.detail = [
+            "attributeGroups": [
+                [
+                    "identifier": "ios.shapeLayer",
+                    "sections": [
+                        [
+                            "identifier": "properties",
+                            "attributes": [
+                                [
+                                    "identifier": "fillRule",
+                                    "semanticPath": "ios.shapeLayer.fillRule",
+                                    "displayTitle": "fillRule",
+                                    "attrTypeName": "string",
+                                    "value": "non-zero"
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+        let output = try Fixtures.makeRunner(service: service).run(arguments: [
+            "check-node-detail",
+            "app-1",
+            "42",
+            "--attribute",
+            "ios.shapeLayer.fillRule",
+            "--expect-value",
+            "non-zero"
+        ])
+
+        guard case .jsonObject(let object) = output else {
+            return XCTFail("check-node-detail should return jsonObject output")
+        }
+        let data = try XCTUnwrap(object["data"] as? [String: Any])
+        XCTAssertEqual(data["passed"] as? Bool, true)
+        XCTAssertEqual((data["attribute"] as? [String: Any])?["semanticPath"] as? String, "ios.shapeLayer.fillRule")
         XCTAssertEqual(service.calls, [.fetchNodeDetail("app-1", "42")])
     }
 

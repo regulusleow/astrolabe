@@ -102,6 +102,10 @@ struct NodeDetailSummaryBuilder {
         if let colorRGBA = valueFormatter.colorRGBA(from: value, attrTypeName: attrTypeName) {
             result["colorRGBA"] = colorRGBA
         }
+        if let semanticPath = attribute["semanticPath"] as? String,
+           !semanticPath.isEmpty {
+            result["semanticPath"] = semanticPath
+        }
         if let semantics = semanticMapper.semantics(
             forIdentifier: identifier,
             appId: appId

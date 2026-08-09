@@ -659,6 +659,47 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         )
     }
 
+    func testResponseMapperPreservesRuntimeCapabilitiesAndNodeRelations() throws {
+        let handshake = try makeHandshake(capabilities: [
+            .hierarchySnapshot,
+            .uiGraphRelations
+        ])
+        let relation = RuntimeNodeRelation(
+            type: try RuntimeNamespacedIdentifier(
+                rawValue: "ios.view.backingLayer"
+            ),
+            sourceNodeID: try RuntimeOpaqueIdentifier(rawValue: "node-1"),
+            targetNodeID: try RuntimeOpaqueIdentifier(rawValue: "node-2"),
+            extensions: try RuntimeExtensionMap(values: [
+                "ios.relation.verified": .boolean(true)
+            ])
+        )
+
+        let mapped = AstrolabeRuntimeResponseMapper().hierarchy(
+            appID: "app-1",
+            handshake: handshake,
+            appInfo: try makeAppInfo(),
+            snapshot: try makeHierarchy(relations: [relation])
+        )
+
+        XCTAssertEqual(
+            mapped["runtimeCapabilities"] as? [String],
+            ["hierarchySnapshot", "uiGraphRelations"]
+        )
+        let relations = try XCTUnwrap(
+            mapped["relations"] as? [[String: Any]]
+        )
+        XCTAssertEqual(relations.count, 1)
+        XCTAssertEqual(relations[0]["type"] as? String, "ios.view.backingLayer")
+        XCTAssertEqual(relations[0]["sourceNodeID"] as? String, "node-1")
+        XCTAssertEqual(relations[0]["targetNodeID"] as? String, "node-2")
+        XCTAssertEqual(
+            (relations[0]["extensions"] as? [String: Any])?["ios.relation.verified"]
+                as? Bool,
+            true
+        )
+    }
+
     func testCLIErrorMapsAstrolabeRuntimeFailures() {
         let error = AstrolabeRuntimeClientError.staleApp(
             runtimeInstanceIdentifier: "runtime-43"
@@ -749,7 +790,9 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         )
     }
 
-    private func makeHierarchy() throws -> RuntimeHierarchySnapshotPayload {
+    private func makeHierarchy(
+        relations: [RuntimeNodeRelation]? = nil
+    ) throws -> RuntimeHierarchySnapshotPayload {
         RuntimeHierarchySnapshotPayload(
             snapshotID: try RuntimeOpaqueIdentifier(rawValue: "snapshot-1"),
             capturedAtUnixTime: 1,
@@ -799,6 +842,7 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
                     children: []
                 )
             ],
+            relations: relations,
             extensions: nil
         )
     }

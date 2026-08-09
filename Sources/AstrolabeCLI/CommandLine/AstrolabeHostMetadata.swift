@@ -7,5 +7,5 @@
 
 package enum AstrolabeHostMetadata {
     /// Host release version advertised during Runtime negotiation.
-    package static let version = "2.1.1"
+    package static let version = "2.2.0"
 }

@@ -258,6 +258,56 @@ export function registerInspectorTools(
   );
 
   server.registerTool(
+    "query_ui_graph",
+    {
+      title: "Query Frozen UI Graph",
+      description: "Traverse a bounded UI relation subgraph from one node in an existing frozen hierarchy snapshot. Requires the uiGraphRelations capability and never recaptures the Runtime hierarchy. Read truncationReasons and frontierOids before deciding whether to expand further.",
+      outputSchema: inspectorToolOutputSchema,
+      inputSchema: {
+        appId: z.string().min(1).describe("appId returned by list_apps"),
+        snapshotId: z.string().uuid().describe("Frozen snapshotId returned by a hierarchy tool"),
+        rootOid: z.string().min(1).describe("Opaque root node ID from the same frozen snapshot"),
+        relationTypes: z.array(z.string().min(1)).min(1).describe("Open namespaced relation identifiers to traverse"),
+        direction: z.enum(["outgoing", "incoming", "both"]).optional().describe("Optional traversal direction; omitted values use the native CLI default"),
+        maxDepth: z.number().int().min(1).max(4).optional().describe("Optional maximum BFS hop count; omitted values use the native CLI default"),
+        nodeLimit: z.number().int().min(1).max(100).optional().describe("Optional maximum returned node count including the root; omitted values use the native CLI default"),
+        relationLimit: z.number().int().min(1).max(200).optional().describe("Optional maximum returned relation count; omitted values use the native CLI default"),
+        byteLimit: z.number().int().min(1024).max(262144).optional().describe("Optional maximum compact JSON byte count for the data object; omitted values use the native CLI default")
+      }
+    },
+    async ({ appId, snapshotId, rootOid, relationTypes, direction, maxDepth, nodeLimit, relationLimit, byteLimit }) => {
+      const args = [
+        "query-ui-graph",
+        appId,
+        "--snapshot-id",
+        snapshotId,
+        "--root-oid",
+        rootOid
+      ];
+      for (const relationType of relationTypes) {
+        args.push("--relation", relationType);
+      }
+      if (direction !== undefined) {
+        args.push("--direction", direction);
+      }
+      if (maxDepth !== undefined) {
+        args.push("--max-depth", String(maxDepth));
+      }
+      if (nodeLimit !== undefined) {
+        args.push("--node-limit", String(nodeLimit));
+      }
+      if (relationLimit !== undefined) {
+        args.push("--relation-limit", String(relationLimit));
+      }
+      if (byteLimit !== undefined) {
+        args.push("--byte-limit", String(byteLimit));
+      }
+      args.push("--json");
+      return toolResponse(await inspectorRunner(inspectorBin, args));
+    }
+  );
+
+  server.registerTool(
     "capture_screenshot",
     {
       title: "Export Current Screenshot",

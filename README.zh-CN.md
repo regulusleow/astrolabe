@@ -1,4 +1,4 @@
-# Astrolabe
+# Astrolabe（星盘）
 
 [English](README.md) | 简体中文
 

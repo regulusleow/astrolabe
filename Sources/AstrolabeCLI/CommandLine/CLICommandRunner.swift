@@ -165,6 +165,9 @@ package struct CLICommandRunner {
                 service: resolvedService,
                 hierarchyResolver: hierarchyResolver
             ),
+            UIGraphCommandGroup(
+                hierarchyResolver: hierarchyResolver
+            ),
             ScreenshotCommandGroup(
                 service: resolvedService,
                 captureWorkflow: captureWorkflow,

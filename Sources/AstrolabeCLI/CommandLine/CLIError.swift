@@ -28,6 +28,10 @@ package enum CLIError: Error, CustomStringConvertible {
     case hierarchySnapshotMismatch
     case hierarchySnapshotStorageLimitExceeded
     case snapshotNodeNotFound
+    case uiGraphUnavailable
+    case invalidUIGraphSnapshot
+    case uiGraphNodeNotFound
+    case uiGraphOutputLimitExceeded
     case invalidPaginationCursor
     case paginationCursorMismatch
     case paginationSnapshotChanged
@@ -72,6 +76,14 @@ package enum CLIError: Error, CustomStringConvertible {
             return "Page hierarchy snapshot exceeds the local storage limit"
         case .snapshotNodeNotFound:
             return "The requested node does not exist in the page hierarchy snapshot"
+        case .uiGraphUnavailable:
+            return "The page hierarchy snapshot does not advertise UI Graph relations"
+        case .invalidUIGraphSnapshot:
+            return "The page hierarchy snapshot contains an invalid UI Graph"
+        case .uiGraphNodeNotFound:
+            return "The requested UI Graph root does not exist in the page hierarchy snapshot"
+        case .uiGraphOutputLimitExceeded:
+            return "The minimum UI Graph projection exceeds the requested byte limit"
         case .invalidPaginationCursor:
             return "Invalid pagination cursor"
         case .paginationCursorMismatch:
@@ -121,6 +133,14 @@ package enum CLIError: Error, CustomStringConvertible {
             return "hierarchy_snapshot_storage_limit_exceeded"
         case .snapshotNodeNotFound:
             return "snapshot_node_not_found"
+        case .uiGraphUnavailable:
+            return "ui_graph_unavailable"
+        case .invalidUIGraphSnapshot:
+            return "invalid_ui_graph_snapshot"
+        case .uiGraphNodeNotFound:
+            return "ui_graph_node_not_found"
+        case .uiGraphOutputLimitExceeded:
+            return "ui_graph_output_limit_exceeded"
         case .invalidPaginationCursor:
             return "invalid_pagination_cursor"
         case .paginationCursorMismatch:
@@ -170,6 +190,14 @@ package enum CLIError: Error, CustomStringConvertible {
             return "Reduce the current hierarchy size or wait for older snapshots to expire"
         case .snapshotNodeNotFound:
             return "Find the node in the specified snapshot instead of reusing an oid from another page"
+        case .uiGraphUnavailable:
+            return "Update the target Runtime, capture a new page snapshot, and verify uiGraphRelations is advertised"
+        case .invalidUIGraphSnapshot:
+            return "Capture a new page snapshot and retry without inferring missing relations"
+        case .uiGraphNodeNotFound:
+            return "Use find-nodes with the same snapshotId and pass one returned oid as --root-oid"
+        case .uiGraphOutputLimitExceeded:
+            return "Increase --byte-limit or query a node with shorter runtime metadata"
         case .invalidPaginationCursor:
             return "Use the complete nextCursor returned by the previous find-nodes call"
         case .paginationCursorMismatch:

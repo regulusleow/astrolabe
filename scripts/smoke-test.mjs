@@ -57,7 +57,8 @@ const expectedMCPToolNames = [
   "find_nodes",
   "inspect_node",
   "check_node",
-  "check_layout"
+  "check_layout",
+  "query_ui_graph"
 ].sort();
 
 let selectedAppId = process.env.ASTROLABE_APP_ID ?? "";

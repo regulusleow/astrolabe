@@ -121,7 +121,7 @@ The protocol has three independent versions that must not be conflated:
 | --- | --- | --- |
 | Package version | `AstrolabeProtocol 2.0.0`, `astrolabe-protocol-kotlin 2.0.0` | SwiftPM and Maven Central dependencies and releases |
 | Wire Protocol version | `2.0` | Runtime handshake and compatibility decisions |
-| Product version | Host 2.1.0 release snapshot: `astrolabe 2.1.1`, `runtime-ios 2.1.0`, `runtime-android 2.0.1` | Independent Host and platform SDK releases |
+| Product version | Host 2.1.0 release snapshot: `astrolabe 2.2.1`, `runtime-ios 2.1.0`, `runtime-android 2.0.1` | Independent Host and platform SDK releases |
 
 The product-version example is a release snapshot, not a lockstep versioning
 requirement.

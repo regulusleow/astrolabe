@@ -108,6 +108,93 @@ test("Astrolabe skill loads advanced inspection guidance progressively", async (
   assert.match(skill, /references\/temporary-patches\.md/);
 });
 
+test("Astrolabe skill gates design verification on target readiness and complete design evidence", async () => {
+  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+  const guidance = await readProjectFile(
+    "skills/astrolabe/references/design-verification.md"
+  ).catch(() => "");
+  const evals = await readProjectFile("skills/astrolabe/evals/evals.json").catch(() => "");
+
+  assert.ok(skill.split("\n").length <= 260);
+  assert.match(skill, /design-verification\.md/);
+  assert.match(skill, /Target State Readiness/i);
+  assert.match(skill, /fresh[\s\S]*formal acceptance[\s\S]*snapshot/i);
+  assert.match(skill, /before readiness.*do not issue.*passed.*failed.*inconclusive/is);
+  assert.match(skill, /visible normal UI/i);
+  assert.match(skill, /App Router|private initializer|unapproved deep link/i);
+  assert.match(skill, /presentation-only/i);
+  assert.match(skill, /snapshot.*preliminary.*discard|discard.*preliminary.*snapshot/is);
+  assert.match(skill, /Design Expectations.*Coverage Ledger.*before.*checks/is);
+  assert.match(skill, /formal acceptance.*after readiness.*passed.*failed.*inconclusive/is);
+
+  assert.match(guidance, /Design source priority/i);
+  assert.match(guidance, /Target Context/i);
+  assert.match(guidance, /Design Expectation/i);
+  for (const policy of [
+    "exact",
+    "minimum",
+    "maximum",
+    "range",
+    "relation",
+    "derived",
+    "conditional"
+  ]) {
+    assert.match(guidance, new RegExp(`\\b${policy}\\b`, "i"));
+  }
+  assert.match(guidance, /tolerance.*measurement error/i);
+  assert.match(guidance, /fixed.*flexible|flexible.*fixed/is);
+  assert.match(guidance, /unique node|coordinate.*evidence/i);
+  assert.match(guidance, /Coverage Ledger/i);
+  assert.match(guidance, /screenshot.*contradiction|contradiction.*screenshot/is);
+  assert.match(guidance, /required failed.*failed/is);
+  assert.match(guidance, /required inconclusive.*unchecked.*inconclusive/is);
+  assert.match(guidance, /notApplicable/);
+  assert.match(guidance, /authoritative contract.*does not apply.*current conditions/is);
+  assert.match(guidance, /notApplicable.*neither.*unchecked.*blocks.*passed/is);
+  assert.match(guidance, /20x20/);
+  assert.match(guidance, /leading.*15/i);
+  assert.match(guidance, /Avatar-to-Title.*10/i);
+  assert.match(guidance, /Title-to-CallIcon.*minimum.*10/i);
+  assert.match(guidance, /centerY/i);
+
+  const evalCatalog = JSON.parse(evals);
+  assert.ok(Array.isArray(evalCatalog.evals));
+  const evalsByID = new Map(evalCatalog.evals.map((entry) => [entry.id, entry]));
+  for (const id of [
+    "fixed-spacing-failure",
+    "legal-adaptive-spacing",
+    "missing-adaptive-contract",
+    "ambiguous-selector",
+    "image-center-mode-overflow",
+    "target-absent-ios-physical-device",
+    "authorized-mock-presentation-only",
+    "exact-policy-pass",
+    "exact-policy-fail",
+    "minimum-policy-pass",
+    "minimum-policy-fail",
+    "maximum-policy-pass",
+    "maximum-policy-fail",
+    "range-policy-pass",
+    "range-policy-fail",
+    "relation-policy-pass",
+    "relation-policy-fail",
+    "derived-policy-pass",
+    "derived-policy-fail",
+    "conditional-policy-pass",
+    "conditional-policy-fail"
+  ]) {
+    assert.ok(evalsByID.has(id), `missing stable eval: ${id}`);
+  }
+  for (const entry of evalCatalog.evals) {
+    assert.equal(typeof entry.prompt, "string");
+    assert.equal(typeof entry.expected_output, "string");
+    assert.ok(Array.isArray(entry.files));
+  }
+  assert.match(evalsByID.get("image-center-mode-overflow").prompt, /27x27/);
+  assert.match(evalsByID.get("image-center-mode-overflow").prompt, /54x54/);
+  assert.match(evalsByID.get("image-center-mode-overflow").prompt, /fully contained/i);
+});
+
 test("Astrolabe skill separates rendered content from its layout container", async () => {
   const skill = await readProjectFile("skills/astrolabe/SKILL.md");
   const guidance = await readProjectFile(

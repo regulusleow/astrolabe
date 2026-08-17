@@ -27,8 +27,29 @@ is running.
      capabilities belong to the selected Runtime.
    - Use the exact latest `appId` for every subsequent call.
 
-2. Freeze the screen context.
-   - Start with `inspect_screen` and retain its `snapshotId`.
+2. Establish Target State Readiness before formal acceptance.
+   - Observe the actual current screen. Do not infer the target from source,
+     route names, or intended navigation.
+   - If the target is absent, use interaction only when both its MCP Tool and
+     Runtime capability exist, and only through visible normal UI.
+   - Otherwise request developer manual navigation, real-condition preparation,
+     or explicit debug-fixture/mock authorization. Never use an App Router,
+     private initializer, unapproved deep link, source shortcut, or business-state
+     mutation to prepare the target.
+   - After any preparation, rediscover the App and re-observe the target. Treat
+     every readiness-observation snapshot as preliminary and discard it; do not
+     reuse it for formal acceptance. Before readiness, do not issue a page
+     `passed`, `failed`, or `inconclusive` verdict because acceptance has not
+     started.
+   - An authorized mock is presentation-only; end-to-end behavior remains
+     unverified. Read [design-verification.md](references/design-verification.md)
+     before any design verification.
+
+3. Freeze the screen context.
+   - After readiness, start with `inspect_screen` to create and retain the fresh,
+     authoritative formal acceptance `snapshotId`.
+   - For design acceptance, create authoritative Design Expectations and a
+     complete Coverage Ledger before selecting or running checks.
    - Pass that same `appId` and `snapshotId` to hierarchy, lookup, detail, and
      structured-check tools while investigating the same state.
    - When tree structure or an implementation node is needed, call
@@ -45,7 +66,7 @@ is running.
    - A screenshot is always latest-state evidence and is not pixel-synchronized
      with an older hierarchy snapshot.
 
-3. Locate the actual rendering node.
+4. Locate the actual rendering node.
    - Use `summarize_hierarchy` when counts and bounded lists are sufficient. Use
      `capture_hierarchy` only when the tree shape or implementation nodes matter.
    - `capture_hierarchy` returns at most 25 nodes by default. Set `nodeLimit` and
@@ -62,7 +83,7 @@ is running.
      expires or changes.
    - Use the selected node's exact `oid` or `detailOid` for follow-up calls.
 
-4. Prove rendered output, not only layout intent.
+5. Prove rendered output, not only layout intent.
    - A layout box describes where a container participates in layout; it does
      not necessarily describe the rendered footprint of its content.
    - Before approving size, containment, clipping, alignment, or visual balance,
@@ -78,7 +99,7 @@ is running.
      can render differently from its container, including images, text, masks,
      transforms, shadows, and descendant drawing.
 
-5. Choose hierarchy or UI Graph deliberately.
+6. Choose hierarchy or UI Graph deliberately.
    - Use hierarchy tools for ordinary parent-child structure.
    - Use `query_ui_graph` for ownership, cross-tree, non-hierarchy relations, or
      a bounded uniform relation traversal. Require both the Tool and the
@@ -91,7 +112,7 @@ is running.
    - Read [ui-graph.md](references/ui-graph.md) for relation semantics,
      platform examples, and exact recovery behavior.
 
-6. Turn requirements into evidence-backed checks.
+7. Turn requirements into evidence-backed checks.
    - Use `check_node` for identity, text, visibility, or exact frame.
    - Use `check_node_detail` for one semantic attribute, `check_style` for a
      related style group, and `check_layout` for relations between nodes.
@@ -101,7 +122,7 @@ is running.
    - Read [visual-regression.md](references/visual-regression.md) for screenshot,
      diff, baseline, coordinate, and dynamic-region rules.
 
-7. Iterate until source-backed behavior is verified.
+8. Iterate until source-backed behavior is verified.
    - After source changes, build and relaunch only when permitted by the user and
      repository instructions.
    - Run `list_apps` again after relaunch because `appId` can change. Capture a
@@ -178,8 +199,14 @@ Report only evidence relevant to the question:
 - Screenshot source, dimensions, scale, and diff result when visual evidence is
   used.
 - Active temporary patches, clearly labeled as experiments.
+- For design verification: readiness, preparation mode, authorization, and
+  verification scope; design provenance and reference viewport; Target Context;
+  Coverage Ledger counts; each failed or inconclusive expectation with expected,
+  actual, and tolerance or range; screenshot/structured-evidence consistency;
+  and final verdict.
 
-For a verification request, end with `passed`, `failed`, or `inconclusive`.
-Only source implementation plus clean Runtime verification can produce
-`passed`. For exploratory or factual questions, answer the finding directly and
-state uncertainty instead of forcing a pass/fail label.
+For formal acceptance after readiness, end with `passed`, `failed`, or
+`inconclusive`. Only source implementation plus clean Runtime verification can
+produce `passed`. Before readiness, report only readiness, blocking condition,
+and requested preparation. For exploratory or factual questions, answer the
+finding directly and state uncertainty instead of forcing a pass/fail label.

@@ -1,0 +1,136 @@
+{
+  "evals": [
+    {
+      "id": "fixed-spacing-failure",
+      "prompt": "Review the ProfileHeader on Android. Design source: PRD DS-42 requires the avatar-to-name gap to be exact 10 logical units. Target Context: 360x800 compact portrait, fontScale 1.0, English, light appearance. Frozen Runtime evidence: Avatar frame {x: 16, width: 40}; Name frame {x: 74, width: 112}; both nodes are unique and visible. Screenshot has no contradiction. Verify the required spacing.",
+      "expected_output": "failed; report exact expected 10, actual 18, measurement tolerance, and the unique node evidence.",
+      "files": ["skills/astrolabe/SKILL.md", "skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "contact-cell-scale2-quantization-fixed-gap-regression",
+      "prompt": "This is a Skill internal rules regression using supplied frozen evidence, not a normal acceptance request that should start or require additional devices. Review the presentation-only ContactCell design fixture for one supplied iPad mini Target Context: 744x1133 at displayScale 2. Scope is only uiGraph.contactCell.section and its four uniquely identified rows: short, long, extreme, and invalidFixedGapRegression. Coverage inventory: geometry 12 required, spatial relations 28 required, final composition 1 required from tail-truncation screenshot evidence. Typography identity, color, glyph rendering, navigation, business conditions, lifecycle, and release behavior are outside scope; do not count adaptive behavior separately from spatial relations. Avatar and CallIcon sizes are 20x20; Avatar leading and CallIcon trailing edges are 15 for every row. Avatar-to-Title exact-10 gaps for short/long/extreme/invalid are 10, 10, 10, and 18; the invalid row source tolerance is 0.01. Title-to-Call minimum-10 gaps for short/long/extreme/invalid are 597, 447, 10, and 405.5. All other required centerY differences are 0; title-to-call same-center-y actual is -0.25, with no source-declared tolerance. Screenshot has no contradiction. Determine the scoped verdict and report raw actuals.",
+      "expected_output": "failed overall because the required fixed Avatar-to-Title gap is expected 10 and actual 18 beyond tolerance 0.01; retain the raw actual. Pass the legal Title-to-Call minimum gaps. Derive the display-scale-2 quantization budget as 1/2 = 0.5 logical unit and pass title-to-call same-center-y actual -0.25 as measurement quantization, not layout flexibility. Report the supplied-evidence Coverage Ledger as geometry 12/12 passed, spatial relations 27/28 passed with 1 failed, and final composition 1/1 passed, plus the scoped presentation-only range without requiring a normal acceptance run on multiple devices.",
+      "files": ["skills/astrolabe/SKILL.md", "skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "legal-adaptive-spacing",
+      "prompt": "Review a Settings row on an iPhone SE. Figma shows a 40-unit title-to-toggle gap on a wider reference frame, but its Auto Layout notes declare a minimum gap of 10 and distribute remaining space. Target Context: 320x568 portrait, English, fontScale 1.0. Frozen Runtime frames measure a 18-unit title-to-toggle gap, with fixed 16-unit row edges preserved. Verify this required adaptive spacing.",
+      "expected_output": "passed for the minimum-gap expectation; do not compare the adaptive gap to the static Figma coordinate.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "missing-adaptive-contract",
+      "prompt": "Review a tablet dashboard spacer. The only design material is a static Figma frame at 1440x1024 showing a 56-unit gap; it has no Auto Layout, breakpoint, min/max, token, formula, or matching accepted baseline. Target Context is 800x1280 portrait. Runtime measures 32 units. The spacer is required. Determine the verdict.",
+      "expected_output": "inconclusive; identify the missing authoritative adaptive contract and do not widen tolerance.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "ambiguous-selector",
+      "prompt": "Review the Checkout screen. The requirement names the visible \"Total\" label, but find_nodes returns two visible UILabel candidates with identical text: a sticky footer and an accessibility mirror. Their frames differ and neither hierarchy path is specified by the contract. Target Context is 390x844 portrait. Verify the label font size.",
+      "expected_output": "inconclusive; report selector ambiguity and require a unique node before checking.",
+      "files": ["skills/astrolabe/SKILL.md", "skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "image-center-mode-overflow",
+      "prompt": "Review the Wallet empty-state icon. Design requirement: the icon must be fully contained inside an exact 27x27 logical-unit box. Target Context: 390x844 portrait at displayScale 3. Frozen Runtime evidence: image view frame 27x27, intrinsic image 54x54, contentMode center, imageScale 1, clipsToBounds false, and no mask or transform reduces the rendered footprint. The latest screenshot shows the icon extending beyond its 27x27 box. Verify the required image rendering.",
+      "expected_output": "failed; the declared containment requirement conflicts with center-mode overflow. Do not treat center mode as universally incorrect.",
+      "files": ["skills/astrolabe/SKILL.md", "skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "target-absent-ios-physical-device",
+      "prompt": "On an iOS physical device, list_apps and inspect_screen show Home, while the requested SubscriptionOffer screen is absent. The selected app has no interaction Tool and no interaction capability. The source mentions a Router route, but no developer authorization exists for a shortcut. What should happen before design acceptance?",
+      "expected_output": "do not start acceptance or issue a verdict; request developer manual navigation, real-condition preparation, or authorized debug fixture/mock. Do not use the Router.",
+      "files": ["skills/astrolabe/SKILL.md", "skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "authorized-mock-presentation-only",
+      "prompt": "A developer explicitly authorizes a debug mock that presents OrderTracking with a delayed shipment card. After rediscovery and formal snapshot capture, verify the card's presentation against the supplied design contract. State the correct verification scope.",
+      "expected_output": "verify presentation-only scope and state that navigation, business conditions, data mapping, lifecycle, and release behavior remain unverified.",
+      "files": ["skills/astrolabe/SKILL.md", "skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "exact-policy-pass",
+      "prompt": "Review the Search field in a compact Android phone context: 360x800, fontScale 1.0. Token radius-md requires an exact corner radius of 12 logical units. The unique input node detail reports cornerRadius 12.0 with a 0.1 measurement tolerance. Verify the required exact expectation.",
+      "expected_output": "passed; actual 12.0 satisfies exact 12 within measurement tolerance.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "exact-policy-fail",
+      "prompt": "Review the Search field in the same compact Android context. Token radius-md requires an exact corner radius of 12 logical units. The unique input node detail reports cornerRadius 16.0 with a 0.1 measurement tolerance. Verify the required exact expectation.",
+      "expected_output": "failed; actual 16.0 violates exact 12.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "minimum-policy-pass",
+      "prompt": "Review an iOS Account row at 390x844. Figma Auto Layout declares that the username-to-chevron gap has a minimum of 12 logical units. Unique frozen frames measure 20 units; fixed row edges and center alignment also hold. Verify the required minimum expectation.",
+      "expected_output": "passed; actual 20 is not below the declared minimum 12.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "minimum-policy-fail",
+      "prompt": "Review the same iOS Account row at 320x568 with a long localized username. The contract still requires the username-to-chevron gap to be at least 12 logical units. Unique frozen frames measure 6 units. Verify the required minimum expectation.",
+      "expected_output": "failed; actual 6 is below the declared minimum 12.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "maximum-policy-pass",
+      "prompt": "Review the Android tablet notification banner at 1280x800. The PRD limits the banner width to a maximum of 640 logical units. The unique banner frame reports width 600. Verify the required maximum expectation.",
+      "expected_output": "passed; actual 600 does not exceed maximum 640.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "maximum-policy-fail",
+      "prompt": "Review the Android tablet notification banner at 1280x800. The PRD limits the banner width to a maximum of 640 logical units. The unique banner frame reports width 712. Verify the required maximum expectation.",
+      "expected_output": "failed; actual 712 exceeds maximum 640.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "range-policy-pass",
+      "prompt": "Review the iOS onboarding illustration spacer in regular portrait size class. The design system permits a range of 24 through 48 logical units after safe-area adjustment. Target Context: 834x1194, top safe area 24. Unique frozen frames measure 36. Verify the required range expectation.",
+      "expected_output": "passed; actual 36 lies within the inclusive range 24 through 48.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "range-policy-fail",
+      "prompt": "Review the iOS onboarding illustration spacer in regular portrait size class. The design system permits a range of 24 through 48 logical units after safe-area adjustment. Target Context: 834x1194, top safe area 24. Unique frozen frames measure 56. Verify the required range expectation.",
+      "expected_output": "failed; actual 56 lies outside the inclusive range 24 through 48.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "relation-policy-pass",
+      "prompt": "Review a MusicPlayer control strip on Android. The design contract requires previous, play, and next icons to share one centerY relation. Target Context: 412x915 portrait. Unique frozen frames produce centerY values 768, 768, and 768. Verify the required relation expectation.",
+      "expected_output": "passed; all three unique nodes satisfy the declared centerY relation.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "relation-policy-fail",
+      "prompt": "Review a MusicPlayer control strip on Android. The design contract requires previous, play, and next icons to share one centerY relation. Target Context: 412x915 portrait. Unique frozen frames produce centerY values 768, 768, and 776. Verify the required relation expectation.",
+      "expected_output": "failed; the next icon violates the declared centerY relation.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "derived-policy-pass",
+      "prompt": "Review a tablet compose screen. The design contract derives the editor height as viewportHeight 900 minus fixed top bar 64, fixed action bar 56, bottom safe area 20, and two fixed 16-unit vertical gaps: 728 logical units. Target Context is 600x900 with bottom safe area 20. The unique editor frame height is 728. Verify the required derived expectation.",
+      "expected_output": "passed; actual 728 equals the declared Target Context derivation.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "derived-policy-fail",
+      "prompt": "Review a tablet compose screen. The design contract derives the editor height as viewportHeight 900 minus fixed top bar 64, fixed action bar 56, bottom safe area 20, and two fixed 16-unit vertical gaps: 728 logical units. Target Context is 600x900 with bottom safe area 20. The unique editor frame height is 692. Verify the required derived expectation.",
+      "expected_output": "failed; actual 692 does not equal the declared Target Context derivation of 728.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "conditional-policy-pass",
+      "prompt": "Review the Android navigation rail. The contract is conditional: compact width uses exact 16-unit content edges; expanded width uses exact 24-unit content edges. Target Context is expanded width 840. The unique rail content frame begins 24 units from the edge. Verify the required conditional expectation.",
+      "expected_output": "passed; expanded-width condition selects the exact 24-unit policy and actual is 24.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    },
+    {
+      "id": "conditional-policy-fail",
+      "prompt": "Review the Android navigation rail. The contract is conditional: compact width uses exact 16-unit content edges; expanded width uses exact 24-unit content edges. Target Context is expanded width 840. The unique rail content frame begins 16 units from the edge. Verify the required conditional expectation.",
+      "expected_output": "failed; expanded-width condition selects 24 but actual is 16.",
+      "files": ["skills/astrolabe/references/design-verification.md"]
+    }
+  ]
+}

@@ -1,4 +1,4 @@
 interface:
   display_name: "Astrolabe UI Inspector"
-  short_description: "Verify running mobile UI behavior with Runtime evidence"
-  default_prompt: "Use Astrolabe MCP to inspect the running mobile app, reuse one frozen snapshot, locate the real content-bearing nodes, and verify layout, rendered content, styles, UI relations, and screenshots with capability-driven evidence."
+  short_description: "Verify a running mobile app UI against design contracts and Runtime evidence"
+  default_prompt: "Use Astrolabe MCP to observe the real target state, prepare it only through authorized visible UI or developer assistance, capture a fresh acceptance snapshot, and verify design contracts, rendered content, styles, UI relations, and screenshots with capability-driven evidence."

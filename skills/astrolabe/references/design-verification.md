@@ -38,6 +38,13 @@ applies: `viewportWidth`, `viewportHeight`, `safeAreaInsets`, `orientation`,
 `sizeClass`, `displayScale`, `fontScale`, `locale`, `appearance`, and
 `systemOccupancy`. Keep logical units distinct from screenshot pixels.
 
+Default acceptance scope is the current Target Context supplied by the
+developer. A passing current device is sufficient for that verdict. Do not
+automatically start, switch to, or require another device, simulator, viewport,
+or breakpoint because an adaptive or display-scale policy exists. Expand scope
+only when the developer explicitly requests multi-device, breakpoint, or
+additional Target Context acceptance.
+
 ## Design Expectation Record
 
 Create one record for every required design fact. Explain every field in the
@@ -81,6 +88,30 @@ maximum, range, remaining-space formula, hug/fill, space-between, safe-area
 rule, or breakpoint policy. Tolerance is measurement error only; never use a
 large tolerance to imitate a flexible range.
 
+## Display Quantization Tolerance
+
+Tolerance covers renderer measurement and display quantization only; it never
+adds layout flexibility or changes a fixed source contract. For frame-derived
+geometry and relations, derive the default quantization budget from Target
+Context `displayScale`: at most `1 / displayScale` logical unit, or one physical
+pixel. Use the smallest tolerance that explains the evidence. If a source or
+token declares a stricter tolerance, use that stricter value. If display scale
+or coordinate provenance is unavailable, do not infer a budget.
+
+Report raw `actual` values even when they pass within this budget. Apply the
+declared tolerance explicitly: `exact` passes when absolute difference is at
+most tolerance; `minimum` passes when actual is at least lower bound minus
+tolerance; `maximum` passes when actual is at most upper bound plus tolerance;
+and `range` passes when actual is within the inclusive bounds expanded by the
+tolerance. This budget cannot conceal a meaningful boundary violation, overflow,
+or fixed-gap regression.
+
+For example, at displayScale 2, a measured `centerY` relation difference of
+`-0.25` passes within the 0.5 logical-unit quantization budget. An exact
+Avatar-to-Title requirement of 10 with actual 18 and tolerance 0.01 still
+fails. Fixed component sizes and edge insets remain exact unless their source
+declares another policy.
+
 ## Coverage and Evidence Gates
 
 Maintain a Coverage Ledger with required expectation counts for: content and
@@ -91,6 +122,10 @@ or `notApplicable` with its evidence status recorded. `notApplicable` is valid
 only when the authoritative contract says the expectation does not apply to
 current conditions. It is neither unchecked nor a result that blocks `passed`
 by itself; an Agent must not use it to evade a required check.
+
+The Coverage Ledger must be complete for the current acceptance scope and
+Target Context only. Other viewports are outside the current verdict by default;
+their absence neither blocks `passed` nor makes the result `inconclusive`.
 
 Use frozen Runtime evidence for exact values and relations. Confirm coordinates
 use the same coordinate space before calculating a gap or alignment. Use latest

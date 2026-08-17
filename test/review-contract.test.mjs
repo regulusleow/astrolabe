@@ -130,6 +130,9 @@ test("Astrolabe skill gates design verification on target readiness and complete
   assert.match(guidance, /Design source priority/i);
   assert.match(guidance, /Target Context/i);
   assert.match(guidance, /Design Expectation/i);
+  assert.match(guidance, /current Target Context.*current device.*sufficient/is);
+  assert.match(guidance, /do not\s+automatically.*another device/is);
+  assert.match(guidance, /Other viewports.*neither blocks.*passed.*inconclusive/is);
   for (const policy of [
     "exact",
     "minimum",
@@ -143,6 +146,10 @@ test("Astrolabe skill gates design verification on target readiness and complete
   }
   assert.match(guidance, /tolerance.*measurement error/i);
   assert.match(guidance, /fixed.*flexible|flexible.*fixed/is);
+  assert.match(guidance, /1\s*\/\s*displayScale/i);
+  assert.match(guidance, /one physical\s+pixel/i);
+  assert.match(guidance, /raw `actual`/i);
+  assert.match(guidance, /never.*layout flexibility/is);
   assert.match(guidance, /unique node|coordinate.*evidence/i);
   assert.match(guidance, /Coverage Ledger/i);
   assert.match(guidance, /screenshot.*contradiction|contradiction.*screenshot/is);
@@ -181,7 +188,8 @@ test("Astrolabe skill gates design verification on target readiness and complete
     "derived-policy-pass",
     "derived-policy-fail",
     "conditional-policy-pass",
-    "conditional-policy-fail"
+    "conditional-policy-fail",
+    "contact-cell-scale2-quantization-fixed-gap-regression"
   ]) {
     assert.ok(evalsByID.has(id), `missing stable eval: ${id}`);
   }
@@ -193,6 +201,12 @@ test("Astrolabe skill gates design verification on target readiness and complete
   assert.match(evalsByID.get("image-center-mode-overflow").prompt, /27x27/);
   assert.match(evalsByID.get("image-center-mode-overflow").prompt, /54x54/);
   assert.match(evalsByID.get("image-center-mode-overflow").prompt, /fully contained/i);
+  const quantizationEval = evalsByID.get(
+    "contact-cell-scale2-quantization-fixed-gap-regression"
+  );
+  assert.match(quantizationEval.prompt, /displayScale 2/i);
+  assert.match(quantizationEval.prompt, /-0\.25/);
+  assert.match(quantizationEval.prompt, /Avatar-to-Title.*18/i);
 });
 
 test("Astrolabe skill separates rendered content from its layout container", async () => {

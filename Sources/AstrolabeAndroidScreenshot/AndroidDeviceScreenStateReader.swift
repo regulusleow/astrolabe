@@ -49,9 +49,10 @@ struct AndroidDeviceScreenStateReader: AndroidDeviceScreenStateReading {
     }
 
     private func resumedApplicationIdentifier(from output: String) -> String? {
-        guard let line = output
-            .split(whereSeparator: \Character.isNewline)
-            .first(where: { $0.contains("topResumedActivity=") }) else {
+        let lines = output.split(whereSeparator: \Character.isNewline)
+        let line = lines.first(where: { $0.contains("topResumedActivity=") })
+            ?? lines.first(where: { $0.contains("mResumedActivity:") })
+        guard let line else {
             return nil
         }
         return line

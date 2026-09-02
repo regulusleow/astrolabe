@@ -59,6 +59,26 @@ final class AndroidScreenshotProviderTests: XCTestCase {
         ])
     }
 
+    func testScreenStateReaderResolvesLegacyAndroidResumedActivity() throws {
+        let runner = ScreenshotADBCommandRunner(results: [
+            commandOutput(
+                "mResumedActivity: ActivityRecord{1553f2c u0 com.example.demo/.MainActivity t31}\n"
+            ),
+            commandOutput("mShowingLockscreen=false\n")
+        ])
+        let reader = AndroidDeviceScreenStateReader(
+            adbClient: ADBClient(commandRunner: runner)
+        )
+
+        let state = try reader.read(deviceSerial: "emulator-5554")
+
+        XCTAssertEqual(
+            state.foregroundApplicationIdentifier,
+            "com.example.demo"
+        )
+        XCTAssertFalse(state.locked)
+    }
+
     func testProviderRejectsTargetIdentifierFromAnotherDevice() throws {
         let provider = AndroidSystemScreenshotProvider(
             adbClient: ADBClient(commandRunner: ScreenshotADBCommandRunner(results: []))
@@ -151,7 +171,10 @@ final class AndroidScreenshotProviderTests: XCTestCase {
 
     func testProviderRejectsCaptureWhenFocusedAppCannotBeResolved() throws {
         let runner = ScreenshotADBCommandRunner(results: [
-            commandOutput("topResumedActivity=null\n"),
+            commandOutput("""
+            topResumedActivity=null
+            mResumedActivity: ActivityRecord{42 u0 com.example.demo/.MainActivity t1}
+            """),
             commandOutput("isStatusBarKeyguard=false\n")
         ])
         let provider = AndroidSystemScreenshotProvider(

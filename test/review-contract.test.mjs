@@ -55,222 +55,79 @@ test("README command examples match the current positional CLI contract", async 
   assert.doesNotMatch(readme, /node-detail --app <app-id>/);
 });
 
-test("Astrolabe skill verifies image rendering beyond the container frame", async () => {
+test("Astrolabe skill stays concise and self-contained", async () => {
   const skill = await readProjectFile("skills/astrolabe/SKILL.md");
+  const skillEntries = await readdir(resolve(projectRoot, "skills/astrolabe"));
 
-  assert.match(skill, /imageSize/);
-  assert.match(skill, /imageScale/);
-  assert.match(skill, /contentMode/);
-  assert.match(skill, /frame or bounds alone/);
-  assert.match(skill, /unscaled content mode/);
-  assert.doesNotMatch(skill, /always use `?scaleAspectFit`?/i);
+  assert.ok(skill.split("\n").length <= 100);
+  assert.deepEqual(
+    skillEntries.filter((entry) => entry !== ".DS_Store").sort(),
+    ["SKILL.md", "agents", "evals"]
+  );
+  assert.doesNotMatch(skill, /references\//);
 });
 
-test("Astrolabe skill is platform-neutral and capability-driven", async () => {
+test("Astrolabe skill gates inspection on a running compatible target", async () => {
   const skill = await readProjectFile("skills/astrolabe/SKILL.md");
 
-  assert.match(skill, /supported mobile platform/i);
-  assert.match(skill, /platform/);
-  assert.match(skill, /capabilities/);
-  assert.match(skill, /logical/);
-  assert.match(skill, /pixel/);
-  assert.match(skill, /snapshotId/);
+  assert.match(skill, /running and remain in the foreground/i);
+  assert.match(skill, /list_apps[\s\S]*compatibility\.status[\s\S]*inspect_screen/i);
   assert.match(skill, /recoverySuggestion/);
-  assert.doesNotMatch(skill, /implementing, debugging, or reviewing an iOS/i);
-  assert.doesNotMatch(skill, /`ios_[a-z_]+`|`android_[a-z_]+`/);
+  assert.match(skill, /build[\s\S]*unit tests[\s\S]*install(?:ed|ation)[\s\S]*killed/i);
+  assert.match(skill, /do not click, scroll, type/i);
+  assert.match(skill, /routes or deep links/i);
+  assert.match(skill, /wait for the developer/i);
 });
 
-test("Astrolabe skill keeps UI graph inspection bounded to one frozen snapshot", async () => {
+test("Astrolabe skill defines the basic MCP and snapshot lifecycle", async () => {
   const skill = await readProjectFile("skills/astrolabe/SKILL.md");
 
-  assert.match(skill, /uiGraphRelations/);
-  assert.match(
-    skill,
-    /capture_hierarchy[\s\S]*query_ui_graph[\s\S]*summarize_node_detail/
-  );
-  assert.match(skill, /truncationReasons/);
-  assert.match(skill, /frontierOids/);
-  assert.match(skill, /omittedFrontierCount/);
+  for (const tool of [
+    "list_apps",
+    "inspect_screen",
+    "find_nodes",
+    "inspect_node",
+    "summarize_node_detail",
+    "capture_screenshot",
+    "check_node",
+    "check_node_detail",
+    "check_style",
+    "check_layout"
+  ]) {
+    assert.match(skill, new RegExp(`\\b${tool}\\b`));
+  }
   assert.match(skill, /same `appId` and `snapshotId`/);
-  assert.doesNotMatch(skill, /`ios_query_ui_graph`|`android_query_ui_graph`/);
+  assert.match(skill, /screenshot[\s\S]*latest[\s\S]*not guaranteed.*snapshot/i);
+  assert.match(skill, /restarted, killed, or reinstalled[\s\S]*discard[\s\S]*appId[\s\S]*snapshotId/i);
+  assert.match(skill, /target state changes[\s\S]*`appId` may stay the same[\s\S]*old snapshot/i);
 });
 
-test("Astrolabe skill loads advanced inspection guidance progressively", async () => {
+test("Astrolabe skill reviews supplied design references with traceable evidence", async () => {
   const skill = await readProjectFile("skills/astrolabe/SKILL.md");
 
-  assert.ok(
-    skill.split("\n").length <= 260,
-    "core skill should stay bounded while advanced workflows live in references"
-  );
-  assert.match(skill, /references\/rendered-content\.md/);
-  assert.match(skill, /references\/ui-graph\.md/);
-  assert.match(skill, /references\/visual-regression\.md/);
-  assert.match(skill, /references\/temporary-patches\.md/);
+  assert.match(skill, /design tool files, images, annotations, visual specifications, design systems/i);
+  assert.match(skill, /text, font family, font size, font weight, line height/i);
+  assert.match(skill, /position, width, height, alignment, relative spacing/i);
+  assert.match(skill, /corner radius, borders, shadows, clipping/i);
+  assert.match(skill, /`appId`, `snapshotId`, and node `oid`/);
+  assert.match(skill, /Design requirement.*Runtime actual.*Evidence.*Result/i);
 });
 
-test("Astrolabe skill gates design verification on target readiness and complete design evidence", async () => {
-  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
-  const guidance = await readProjectFile(
-    "skills/astrolabe/references/design-verification.md"
-  ).catch(() => "");
-  const evals = await readProjectFile("skills/astrolabe/evals/evals.json").catch(() => "");
+test("Astrolabe skill metadata and evals match the simplified contract", async () => {
+  const metadata = await readProjectFile("skills/astrolabe/agents/openai.yaml");
+  const evalCatalog = JSON.parse(await readProjectFile("skills/astrolabe/evals/evals.json"));
 
-  assert.ok(skill.split("\n").length <= 260);
-  assert.match(skill, /design-verification\.md/);
-  assert.match(skill, /Target State Readiness/i);
-  assert.match(skill, /fresh[\s\S]*formal acceptance[\s\S]*snapshot/i);
-  assert.match(skill, /before readiness.*do not issue.*passed.*failed.*inconclusive/is);
-  assert.match(skill, /visible normal UI/i);
-  assert.match(skill, /App Router|private initializer|unapproved deep link/i);
-  assert.match(skill, /presentation-only/i);
-  assert.match(skill, /snapshot.*preliminary.*discard|discard.*preliminary.*snapshot/is);
-  assert.match(skill, /Design Expectations.*Coverage Ledger.*before.*checks/is);
-  assert.match(skill, /formal acceptance.*after readiness.*passed.*failed.*inconclusive/is);
-
-  assert.match(guidance, /Design source priority/i);
-  assert.match(guidance, /Target Context/i);
-  assert.match(guidance, /Design Expectation/i);
-  assert.match(guidance, /current Target Context.*current device.*sufficient/is);
-  assert.match(guidance, /do not\s+automatically.*another device/is);
-  assert.match(guidance, /Other viewports.*neither blocks.*passed.*inconclusive/is);
-  for (const policy of [
-    "exact",
-    "minimum",
-    "maximum",
-    "range",
-    "relation",
-    "derived",
-    "conditional"
-  ]) {
-    assert.match(guidance, new RegExp(`\\b${policy}\\b`, "i"));
-  }
-  assert.match(guidance, /tolerance.*measurement error/i);
-  assert.match(guidance, /fixed.*flexible|flexible.*fixed/is);
-  assert.match(guidance, /1\s*\/\s*displayScale/i);
-  assert.match(guidance, /one physical\s+pixel/i);
-  assert.match(guidance, /raw `actual`/i);
-  assert.match(guidance, /never.*layout flexibility/is);
-  assert.match(guidance, /unique node|coordinate.*evidence/i);
-  assert.match(guidance, /Coverage Ledger/i);
-  assert.match(guidance, /screenshot.*contradiction|contradiction.*screenshot/is);
-  assert.match(guidance, /required failed.*failed/is);
-  assert.match(guidance, /required inconclusive.*unchecked.*inconclusive/is);
-  assert.match(guidance, /notApplicable/);
-  assert.match(guidance, /authoritative contract.*does not apply.*current conditions/is);
-  assert.match(guidance, /notApplicable.*neither.*unchecked.*blocks.*passed/is);
-  assert.match(guidance, /20x20/);
-  assert.match(guidance, /leading.*15/i);
-  assert.match(guidance, /Avatar-to-Title.*10/i);
-  assert.match(guidance, /Title-to-CallIcon.*minimum.*10/i);
-  assert.match(guidance, /centerY/i);
-
-  const evalCatalog = JSON.parse(evals);
-  assert.ok(Array.isArray(evalCatalog.evals));
-  const evalsByID = new Map(evalCatalog.evals.map((entry) => [entry.id, entry]));
-  for (const id of [
-    "fixed-spacing-failure",
-    "legal-adaptive-spacing",
-    "missing-adaptive-contract",
-    "ambiguous-selector",
-    "image-center-mode-overflow",
-    "target-absent-ios-physical-device",
-    "authorized-mock-presentation-only",
-    "exact-policy-pass",
-    "exact-policy-fail",
-    "minimum-policy-pass",
-    "minimum-policy-fail",
-    "maximum-policy-pass",
-    "maximum-policy-fail",
-    "range-policy-pass",
-    "range-policy-fail",
-    "relation-policy-pass",
-    "relation-policy-fail",
-    "derived-policy-pass",
-    "derived-policy-fail",
-    "conditional-policy-pass",
-    "conditional-policy-fail",
-    "contact-cell-scale2-quantization-fixed-gap-regression"
-  ]) {
-    assert.ok(evalsByID.has(id), `missing stable eval: ${id}`);
-  }
+  assert.match(metadata, /running mobile app UI/i);
+  assert.match(metadata, /\$astrolabe/);
+  assert.equal(evalCatalog.skill_name, "astrolabe");
+  assert.deepEqual(evalCatalog.evals.map((entry) => entry.id), [1, 2]);
   for (const entry of evalCatalog.evals) {
     assert.equal(typeof entry.prompt, "string");
     assert.equal(typeof entry.expected_output, "string");
-    assert.ok(Array.isArray(entry.files));
+    assert.deepEqual(entry.files, []);
+    assert.ok(Array.isArray(entry.expectations));
+    assert.ok(entry.expectations.length > 0);
   }
-  assert.match(evalsByID.get("image-center-mode-overflow").prompt, /27x27/);
-  assert.match(evalsByID.get("image-center-mode-overflow").prompt, /54x54/);
-  assert.match(evalsByID.get("image-center-mode-overflow").prompt, /fully contained/i);
-  const quantizationEval = evalsByID.get(
-    "contact-cell-scale2-quantization-fixed-gap-regression"
-  );
-  assert.match(quantizationEval.prompt, /displayScale 2/i);
-  assert.match(quantizationEval.prompt, /-0\.25/);
-  assert.match(quantizationEval.prompt, /Avatar-to-Title.*18/i);
-});
-
-test("Astrolabe skill separates rendered content from its layout container", async () => {
-  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
-  const guidance = await readProjectFile(
-    "skills/astrolabe/references/rendered-content.md"
-  ).catch(() => "");
-  const contract = `${skill}\n${guidance}`;
-
-  assert.match(contract, /layout box/i);
-  assert.match(contract, /rendered footprint/i);
-  assert.match(contract, /intrinsic content/i);
-  assert.match(contract, /mapping policy/i);
-  assert.match(contract, /clipping or masking/i);
-  assert.match(contract, /transform or visual effect/i);
-  assert.match(contract, /cannot produce `passed`/i);
-  assert.match(contract, /imageSize/);
-  assert.match(contract, /contentMode/);
-});
-
-test("Astrolabe skill distinguishes UI graph tool and Runtime failures", async () => {
-  const guidance = await readProjectFile(
-    "skills/astrolabe/references/ui-graph.md"
-  ).catch(() => "");
-
-  assert.match(guidance, /Tool is unavailable/i);
-  assert.match(guidance, /uiGraphRelations/);
-  assert.match(guidance, /invalid_ui_graph_snapshot/);
-  assert.match(guidance, /ui_graph_node_not_found/);
-  assert.match(guidance, /capture_hierarchy.*same `snapshotId`/is);
-});
-
-test("Astrolabe skill metadata covers rendered content and UI relations", async () => {
-  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
-  const metadata = await readProjectFile(
-    "skills/astrolabe/agents/openai.yaml"
-  );
-
-  assert.match(skill.slice(0, skill.indexOf("---", 4)), /rendered content/i);
-  assert.match(skill.slice(0, skill.indexOf("---", 4)), /UI relations/i);
-  assert.match(metadata, /rendered content/i);
-  assert.match(metadata, /UI relations/i);
-});
-
-test("Astrolabe skill does not treat node details as an atomic hierarchy snapshot", async () => {
-  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
-
-  assert.match(skill, /detailSource/);
-  assert.match(skill, /snapshotCache/);
-  assert.match(skill, /liveRuntime/);
-  assert.match(skill, /detailCapturedAtUnixTime/);
-  assert.match(skill, /not.*atomic|not.*same capture time/is);
-});
-
-test("Astrolabe skill rejects absence conclusions from a truncated hierarchy", async () => {
-  const skill = await readProjectFile("skills/astrolabe/SKILL.md");
-
-  assert.match(skill, /summarize_hierarchy/);
-  assert.match(skill, /maxDepth/);
-  assert.match(skill, /nodeCount/);
-  assert.match(skill, /returnedNodeCount/);
-  assert.match(skill, /omittedNodeCount/);
-  assert.match(skill, /truncated/);
-  assert.match(skill, /not.*(?:absent|missing).*truncated/is);
 });
 
 test("public documentation advertises delivered Android View support", async () => {

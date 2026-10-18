@@ -79,12 +79,18 @@ MCP `capture_hierarchy` 的既有默认 nodeLimit=25、最大 200 仍生效。�
 
 同进程切后台后，source MCP 新连接的 `inspect_screen(includeSemantics=true)` 返回 `astrolabe_runtime_inspection.applicationInactive`，没有 data。此前同流程的 `internalFailure` 已被真实 GREEN 替代。原始证据为 `final-*.json`；不同构建和进程的结果不混写为同一次捕获。
 
+恢复前台后，新语义捕获成功；MCP `query_ui_graph` 对保存页面查询 `tree.semanticChild`，返回 4 个节点、3 条边，未截断。MCP 截图为 1206×2622 pixels / 402×874 logical / scale 3，确认当前页面为 B；截图时间独立，不宣称和旧快照同步。
+
+2026-10-19 00:47:55（Asia/Shanghai），最新 `96d6be2` 原 A 自然超过 300 秒后，通过只读 Wire 再请求其绑定详情：`inspection.snapshotUnavailable`，没有 payload，没有当前 B 回退。证据 `final-runtime-A-expired.json`，补足最终版本的实际 TTL 验证。
+
 ## 最终门禁与交接
 
 - Protocol：Swift 31、Kotlin 41、62 个 Schema fixtures（32 valid / 30 invalid）、15 项工具测试及 Release build 通过。
 - Runtime 采集版本：52 XCTest（Core 39 / UIKit 纯策略 8 / Runtime 3 / ObjC 2），Simulator 动态框架 build 通过。保留基线已有 `Supported platforms for the buildables in the current scheme is empty` 警告；不宣称无警告构建。
 - Runtime 最终 `96d6be2`：重新运行 52 XCTest 与同一 Simulator build，均通过；上述既有警告仍在。动态二进制 SHA-256 `5a35993f5c45829e1b3c049f9114d629b6e2fc002136e0abbf4ce2fc5b284eeb`。
 - Host 角色修复版本：Swift 287 / 287、MCP 44 / 44、typecheck 与 build 通过，无新警告。新增测试是协议/缓存/映射/命令纯逻辑，不是 UI 单测。
+- 收尾对当前提交再跑：Protocol Swift 31、Runtime 52、Host 287、MCP 44，全部 exit 0；Host build、MCP typecheck 同样 exit 0。对应 `final-*-swift.log`、`final-mcp-tests.log`、`final-mcp-typecheck.log`、`final-host-build.log`。
+- 最终独立跨仓审查通过：Critical 0 / Important 0 / Minor 0。审查范围为 Protocol `1c488bf..0593837`、Runtime `3c906ad..96d6be2`、Host `340046d..1a3ef34`；覆盖生产实现、回归测试、初次验收文档及后续最终 TTL / Graph 证据。之后仅补充本记录和计划完成状态，未改产品源码。
 
 Protocol 尚未推送。Host/Runtime 的 Package.swift 固定完整 Protocol SHA；本地用仓库级 SwiftPM mirror，无 tracked 绝对路径或全局配置修改。开发者推送时先使该 Protocol SHA 远程可获取，再运行消费者 CI / 创建 PR。
 
@@ -99,3 +105,18 @@ astrolabe check-style "$appId" --snapshot-id "$pageSnapshotId" --oid "$oid" --ex
 ```
 
 验证范围仅为本机 iOS 27.0 Simulator。未验证真机、其他系统版本、所有 SwiftUI 控件、富文本逐 run、全量性能或生产集成；不宣称已完成这些支持。正式 App Store 成品必须排除 Runtime 并检查最终产物。
+
+## 执行裁决与代价
+
+按执行记录先后排列，供后续 review：
+
+1. 已确认设计后连续实施，不逐任务暂停。若方向判断有误，需回退对应原子提交。
+2. 使用已有 develop checkout，不另建 worktree，遵守本轮分支要求。代价是共享开发目录；因此保留原有 Demo 未提交文档、不清理用户文件。
+3. 设计/计划使用可追踪的 docs/architecture、docs/plans，避开被忽略目录。代价是仓库增加设计记录。
+4. 消费者固定实际 Protocol SHA；仅本仓库配置本地 mirror，不造发布 tag。代价是远程 CI 前必须先推送 Protocol。
+5. 执行/审查脚本显式指定输出路径，避免 github/GitHub 大小写产生重复执行目录。代价是额外指定路径。
+6. 已精确证明的非 Text 元数据叶子不否定独立 Text 字段；未知原始 Entry/storage/Text 分支仍阻断 canonical。若白名单证明有误，可能错误提升字段；因此限制精确类型、owner 与字段，不按路径猜测。
+7. LocalizedStringKey 仅在已知 hasFormatting=false 且精确参数数组为空时证明作用域。代价是格式化文本样式较保守，可能仅返回候选。
+8. 有新能力 Runtime 的无页面详情入口先做 request-only detail；拒绝或无绑定 semanticContext 不重抓，native 成功才继续。代价是 native 成功流程多一次只读详情，无效 oid 不自动补 registry。
+9. 语义角色只采用已知 Runtime role，不新增推断来源框架。代价是未知开放角色不能按 Host 已知角色检索；原始值仍保留。
+10. 上述预检限定 inspect-node/check-style/node-detail；find-nodes/check-node/check-layout 保持原查询边界。代价是无 page 的默认原生查询找不回历史语义 ID；调用者必须使用保存页面或明确新语义捕获。

@@ -10,6 +10,8 @@
 
 **Spec:** `../architecture/2026-10-18-swiftui-semantic-inspection.md`
 
+**Status:** 2026-10-19 完成首个产品切片。冷启动只读 AX 路径可用，无需触发不可用分支的补救；实际 CLI/MCP、冻结详情、隐私及窗口验收和最终跨仓审查通过。结果与未验证范围见 `../results/2026-10-18-swiftui-semantic-inspection.md`。保留各仓库 develop 本地提交，不推送或合并。
+
 ## Global Constraints
 
 - 三个产品仓库在 develop 开发；允许本任务原子提交，不推送、PR、合并或发布。
@@ -38,11 +40,11 @@
 
 **Interfaces:** 提供 Spec 表中 RuntimeSemanticCaptureOptions/Capture/Node/DetailContext/TextCandidate/TextField/InspectionIssue/InspectionWindow；现有 hierarchy 参数新增 semanticCapture?，payload 新增 semanticCapture?，nodeDetail 参数新增 snapshotID?，payload 新增 semanticContext?；RuntimeCapability.semanticInspection。为 error.extensions[common.inspectionTargets] 提供 typed 访问器。所有现有初始化调用仍可省略新增 optional 参数。
 
-- [ ] 先写测试：旧 required 渲染 geometry 不能为 null；新语义节点 frame 可缺失；新参数/局部状态/冻结上下文 round trip；候选属性类型保持；重复 nodeID、父边错配、非法坐标/计数/路径预算拒绝。
-- [ ] 运行 `swift test`，确认新增行为在实现前失败，并记录原因。
-- [ ] 实现最小 DTO/校验/Schema/访问器，保留既有值类型和开放 role/source；不要新增 wire 顶层 partial 状态。
-- [ ] 跑 `swift test`、现有 Kotlin 测试和 Schema fixture 验证（按本仓库 CI 中真实命令）；正反例证明旧请求/渲染约束保留。
-- [ ] 自审、原子提交 `feat(protocol): 添加有类型语义检查契约`；报告完整 SHA、公共签名、RED/GREEN 和仍未验证项。
+- [x] 先写测试：旧 required 渲染 geometry 不能为 null；新语义节点 frame 可缺失；新参数/局部状态/冻结上下文 round trip；候选属性类型保持；重复 nodeID、父边错配、非法坐标/计数/路径预算拒绝。
+- [x] 运行 `swift test`，确认新增行为在实现前失败，并记录原因。
+- [x] 实现最小 DTO/校验/Schema/访问器，保留既有值类型和开放 role/source；不要新增 wire 顶层 partial 状态。
+- [x] 跑 `swift test`、现有 Kotlin 测试和 Schema fixture 验证（按本仓库 CI 中真实命令）；正反例证明旧请求/渲染约束保留。
+- [x] 自审、原子提交 `feat(protocol): 添加有类型语义检查契约`；报告完整 SHA、公共签名、RED/GREEN 和仍未验证项。
 
 ### Task 2: iOS semantic runtime and frozen values
 
@@ -52,12 +54,12 @@
 
 **Interfaces:** package @MainActor RuntimeSemanticInspectionProviding 定义 `capture(options: RuntimeSemanticCaptureOptions) async throws -> RuntimeHierarchySnapshotPayload`、`detail(nodeID: RuntimeOpaqueIdentifier, snapshotID: RuntimeOpaqueIdentifier) async throws -> RuntimeNodeDetailPayload`。RuntimeInspectionServices 新 optional semantic provider 参数；原 provider 接口含义不变。Core store 接受冻结 capture/detail 值，按 Spec 限制写入和读取；时间可注入纯逻辑测试。
 
-- [ ] 先写纯 Core 测试：A值不随B更新；错快照/节点、300秒过期、第五次捕获驱逐、单次/总字节限制；不调用 live fallback；unsupported semantic route 拒绝。
-- [ ] 跑受影响测试观察 RED；实现 store、分派和 explicit provider seam 后 GREEN，保持旧测试通过。
-- [ ] 从 Demo 仅迁移已验证 Text 白名单/预算/安全读取政策，输出 Task1 typed 值；不要复制完整探针框架。所有安全出口按 Spec 共同受限。
-- [ ] 工厂组合原 UIKit render provider 与 AX/Text adapter；先只读获取 AX 数据，不调用 accessibilityActivate/伪 VoiceOver 通知。contextChanged、窗口歧义/失效/后台拒绝带 typed 诊断。
-- [ ] 跑完整 `swift test` 与 iOS Simulator build；无新增 UI 单测。真实运行是否可读由 Task4 验证，不能拿 build 替代。
-- [ ] 自审、原子提交 `feat(ios): 接入有界语义采集与冻结详情`；报告 SHA、依赖设置、测试及运行限制。
+- [x] 先写纯 Core 测试：A值不随B更新；错快照/节点、300秒过期、第五次捕获驱逐、单次/总字节限制；不调用 live fallback；unsupported semantic route 拒绝。
+- [x] 跑受影响测试观察 RED；实现 store、分派和 explicit provider seam 后 GREEN，保持旧测试通过。
+- [x] 从 Demo 仅迁移已验证 Text 白名单/预算/安全读取政策，输出 Task1 typed 值；不要复制完整探针框架。所有安全出口按 Spec 共同受限。
+- [x] 工厂组合原 UIKit render provider 与 AX/Text adapter；先只读获取 AX 数据，不调用 accessibilityActivate/伪 VoiceOver 通知。contextChanged、窗口歧义/失效/后台拒绝带 typed 诊断。
+- [x] 跑完整 `swift test` 与 iOS Simulator build；无新增 UI 单测。真实运行是否可读由 Task4 验证，不能拿 build 替代。
+- [x] 自审、原子提交 `feat(ios): 接入有界语义采集与冻结详情`；报告 SHA、依赖设置、测试及运行限制。
 
 ### Task 3: Host/CLI/MCP semantic workflow
 
@@ -67,11 +69,11 @@
 
 **Interfaces:** hierarchy 请求可表达 includeSemantics 与 windowID；`--include-semantics`/`--window-id` 和既有工具 `includeSemantics`/`windowId`。语义 items 保存在 semanticItems，不伪造渲染字段；旧 displayItems 不变。Host 保存 runtimeSnapshotId/runtimeCapturedAtUnixTime，再分配 page snapshot ID。语义 inspect-node 消费已保存的 page snapshot，上送 Runtime snapshotID 并验证返回 semanticContext。
 
-- [ ] 先写测试：capability 缺失拒绝、不忽略 window；缺 page snapshot 不抓当前 UI；runtime/page ID 不混；A→B后请求A不取B；过期不回退；partial/歧义样式不通过；原 iOS/Android output 不变。特别覆盖 HierarchyNodeExtractor.nodeSnapshot/visibility 的现有 false/1/空 bounds 默认，不可应用于 kind=semantic；未知可见性不能匹配确定 true 或 false 的断言，默认查找仍能返回可检查语义候选。
-- [ ] 运行精确测试观察 RED；实现最小参数传递、mapper、上下文验证和缓存读取，补 graph semantic kind/tree.semanticChild。
-- [ ] 保存 error 的 typed 选择诊断、detail.extensions/semanticContext；字典映射不能把 nil 可见性改 true 或伪造 UILabel。
-- [ ] 跑完整 `swift test` 和 mcp-adapter 现有测试/类型检查；每组实际命令与结果入报告。
-- [ ] 自审、原子提交 `feat(host): 贯通语义快照检查链路`。
+- [x] 先写测试：capability 缺失拒绝、不忽略 window；缺 page snapshot 不抓当前 UI；runtime/page ID 不混；A→B后请求A不取B；过期不回退；partial/歧义样式不通过；原 iOS/Android output 不变。特别覆盖 HierarchyNodeExtractor.nodeSnapshot/visibility 的现有 false/1/空 bounds 默认，不可应用于 kind=semantic；未知可见性不能匹配确定 true 或 false 的断言，默认查找仍能返回可检查语义候选。
+- [x] 运行精确测试观察 RED；实现最小参数传递、mapper、上下文验证和缓存读取，补 graph semantic kind/tree.semanticChild。
+- [x] 保存 error 的 typed 选择诊断、detail.extensions/semanticContext；字典映射不能把 nil 可见性改 true 或伪造 UILabel。
+- [x] 跑完整 `swift test` 和 mcp-adapter 现有测试/类型检查；每组实际命令与结果入报告。
+- [x] 自审、原子提交 `feat(host): 贯通语义快照检查链路`。
 
 ### Task 4: Running-App acceptance and final review
 
@@ -79,8 +81,8 @@
 
 **Interfaces:** 使用前三项真实产物，Simulator iOS27.0、现有 SwiftUIInspectorTest 页面及既有 Host CLI/MCP；只针对该 Demo 允许宿主准备 UI。Runtime 自身只读。
 
-- [ ] 构建并将 Runtime 加载进现有 Demo，确认持续运行、前台、目标明确。优先零业务源码改动的测试加载；不写全局注入配置。
-- [ ] 经真实 CLI/MCP 验证冷启动首抓、原始字体/语义标签、旧快照冻结、同文案不同实例、安全输入、窗口选择/后台拒绝；记录不同构建 UUID 和时间，不能复用旧 Demo JSON 冒充本次验收。
-- [ ] 若冷启动只读 AX 路径确实不可用，先调查公开 getter/已验证系统读路径；不越过无业务动作政策。无法证明则报告实际未通过项，不标完成支持。
-- [ ] 独立 whole-branch 审查三个 commit 范围；影响正确性的发现走 RED→GREEN 修复并重跑覆盖套件，不新增 UI 单测。
-- [ ] 提交报告/必要修复，核对三仓库 develop、diff --check、提交与 upstream 关系；不推送、不合并，交接本地 SHA 与能力边界后停下。
+- [x] 构建并将 Runtime 加载进现有 Demo，确认持续运行、前台、目标明确。优先零业务源码改动的测试加载；不写全局注入配置。
+- [x] 经真实 CLI/MCP 验证冷启动首抓、原始字体/语义标签、旧快照冻结、同文案不同实例、安全输入、窗口选择/后台拒绝；记录不同构建 UUID 和时间，不能复用旧 Demo JSON 冒充本次验收。
+- [x] 若冷启动只读 AX 路径确实不可用，先调查公开 getter/已验证系统读路径；不越过无业务动作政策。无法证明则报告实际未通过项，不标完成支持。
+- [x] 独立 whole-branch 审查三个 commit 范围；影响正确性的发现走 RED→GREEN 修复并重跑覆盖套件，不新增 UI 单测。
+- [x] 提交报告/必要修复，核对三仓库 develop、diff --check、提交与 upstream 关系；不推送、不合并，交接本地 SHA 与能力边界后停下。

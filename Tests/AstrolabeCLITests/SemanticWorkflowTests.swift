@@ -5,6 +5,43 @@ import AstrolabeProtocol
 final class SemanticWorkflowTests: XCTestCase {
     private let node: [String: Any] = ["oid": "semantic-A-1", "className": "SwiftUI.AccessibilityNode", "kind": "semantic", "runtimeRole": "text", "customDisplayTitle": "Title", "subitems": []]
 
+    func testSemanticButtonTimerLabelDoesNotInventTextOrTimerRoles() throws {
+        var button = node
+        button["runtimeRole"] = "button"
+        button["customDisplayTitle"] = "01:30"
+        button["semanticRoles"] = ["button", "text", "timer"]
+        let extractor = HierarchyNodeExtractor()
+        XCTAssertEqual(extractor.semanticRoles(from: button), [.button])
+        XCTAssertEqual(extractor.nodeSnapshot(from: button)["semanticRoles"] as? [String], ["button"])
+        let record = HierarchyNodeRecord(node: button, hierarchyPath: "semantic[0]", depth: 0, siblingIndex: 0)
+        XCTAssertEqual(HierarchyNodeSearchProjectionBuilder().buildProjection(from: record)["semanticRoles"] as? [String], ["button"])
+        for role in [NodeSemanticRole.text, .timer] {
+            let query = HierarchyNodeQuery(oid: nil, className: nil, text: nil, semanticRole: role, visibleOnly: false, limit: nil)
+            XCTAssertNil(HierarchyNodeFinder().firstNodeSnapshot(in: ["semanticItems": [button]], query: query))
+        }
+    }
+
+    func testUnknownSemanticRolePreservesRawRoleWithoutAvatarInference() throws {
+        var unknown = node
+        unknown["runtimeRole"] = "vendor.unknown"
+        unknown["customDisplayTitle"] = "avatar"
+        unknown["semanticRoles"] = ["image", "avatar"]
+        let extractor = HierarchyNodeExtractor()
+        XCTAssertEqual(extractor.semanticRoles(from: unknown), [])
+        let snapshot = extractor.nodeSnapshot(from: unknown)
+        XCTAssertEqual(snapshot["runtimeRole"] as? String, "vendor.unknown")
+        XCTAssertEqual(snapshot["semanticRoles"] as? [String], [])
+        for role in [NodeSemanticRole.image, .avatar] {
+            let query = HierarchyNodeQuery(oid: nil, className: nil, text: nil, semanticRole: role, visibleOnly: false, limit: nil)
+            XCTAssertNil(HierarchyNodeFinder().firstNodeSnapshot(in: ["semanticItems": [unknown]], query: query))
+        }
+    }
+
+    func testNativeDomainRoleInferenceRemainsUnchanged() {
+        let native: [String: Any] = ["kind": "view", "className": "UIView", "customDisplayTitle": "avatar 01:30", "semanticRoles": ["button"]]
+        XCTAssertEqual(NodeSemanticRoleClassifier().roles(for: native), [.button, .avatar, .image, .timer, .text])
+    }
+
     func testSemanticNodesRemainInspectableWithoutInventingRenderFacts() throws {
         let extractor = HierarchyNodeExtractor()
         let records = extractor.collectNodeRecords(in: ["displayItems": [], "semanticItems": [node]])

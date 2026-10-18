@@ -15,6 +15,9 @@ export const inspectorToolOutputSchema = {
   /** Command-specific structured data. */
   data: z.unknown().optional().describe("Command-specific structured data"),
 
+  /** Namespaced Runtime error diagnostics, including typed inspection target inventories. */
+  extensions: z.record(z.unknown()).optional().describe("Namespaced Runtime diagnostics preserved from the CLI"),
+
   /** Stable machine-readable failure code. */
   errorCode: z.string().min(1).optional().describe("Stable machine-readable failure code"),
 

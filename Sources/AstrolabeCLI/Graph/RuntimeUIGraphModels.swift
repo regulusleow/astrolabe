@@ -10,6 +10,7 @@ import AstrolabeProtocol
 enum RuntimeUIGraphNodeKind: String, Equatable {
     case view
     case layer
+    case semantic
 }
 
 enum RuntimeUIGraphQueryLimits {
@@ -188,6 +189,8 @@ enum RuntimeUIGraphError: Error, Equatable {
 enum RuntimeUIGraphBuiltInRelation {
     static let viewChild = identifier("tree.viewChild")
     static let layerChild = identifier("tree.layerChild")
+    /// Actual AX container relation, separate from render-tree child edges.
+    static let semanticChild = identifier("tree.semanticChild")
 
     private static func identifier(
         _ rawValue: String

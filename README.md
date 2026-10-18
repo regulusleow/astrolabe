@@ -122,6 +122,52 @@ Hierarchy commands return a `snapshotId`. Pass it to subsequent hierarchy,
 node, style, and layout commands to keep the workflow bound to the captured
 page. Screenshot and visual comparison commands always use the latest screen.
 
+For a Runtime advertising `semanticInspection`, explicitly request semantic facts:
+
+```bash
+astrolabe capture-hierarchy <app-id> --include-semantics --window-id <window-id> --json
+astrolabe find-nodes <app-id> --snapshot-id <page-snapshot-id> --role text --json
+astrolabe inspect-node <app-id> --snapshot-id <page-snapshot-id> --oid <semantic-oid> --json
+astrolabe check-style <app-id> --snapshot-id <page-snapshot-id> --oid <semantic-oid> --expect fontSize 28 --json
+```
+
+`--window-id` is optional when exactly one eligible ordinary window exists. It
+requires `--include-semantics`; neither capture selector can accompany
+`--snapshot-id`. Ambiguous or unavailable targets return typed window diagnostics
+in `extensions.common.inspectionTargets`, including excluded windows. An unsupported
+Runtime fails explicitly. Omitted semantic options preserve render capture.
+
+The existing MCP tools `capture_hierarchy`, `summarize_hierarchy`, `inspect_screen`,
+and `find_nodes` accept optional `includeSemantics` and `windowId`. Their CLI
+commands accept the corresponding flags. Semantic nodes live in `semanticItems`,
+separate from render `displayItems`; they preserve actual runtime types, AX frames,
+and source. AX geometry does not establish visibility, opacity, local bounds, or
+physical interaction. Unqualified searches include semantic candidates; visible-only
+searches require proven render visibility. UI Graph uses `tree.semanticChild` and
+only Runtime-witnessed cross-source relations.
+
+Semantic detail requires the saved Host page `snapshotId`. Host retains the original
+`runtimeSnapshotId` and `runtimeCapturedAtUnixTime` before assigning its page ID.
+Detail misses query that frozen Runtime capture, validate node, snapshot, source,
+and original time, and report `detailSource=runtimeSnapshot`. Cached historical
+detail can be read while the app is unavailable. Missing, expired, or mismatched
+captures fail without recapturing current UI. Native view/layer details retain their
+existing live behavior.
+
+On a Runtime advertising `semanticInspection`, an exact bare oid is verified by
+a direct node-detail request before any automatic hierarchy capture. Refused or
+unknown IDs stop immediately; successful native IDs retain the usual live
+inspection flow. IDs therefore must come from an existing capture in the same
+Runtime process. Runtimes without that capability retain the prior native flow.
+Host never infers semantic identity from an ID prefix or numeric shape.
+
+Inspect `semanticCapture` and `semanticContext` availability/issues rather than
+assuming complete visual recovery. Candidate Text fields remain in
+`semanticContext.textCandidates`; they never satisfy style assertions. Missing or
+ambiguous semantic style returns `verification=unableToVerify`, while an independently
+proven canonical field can be checked even when other fields are partial. See the
+[approved semantic contract](docs/architecture/2026-10-18-swiftui-semantic-inspection.md).
+
 The installed MCP server exposes the same capabilities to Codex, OpenCode, and
 Claude Code. The bundled skill guides app discovery, snapshot reuse, node
 selection, runtime checks, screenshots, visual comparison, and temporary

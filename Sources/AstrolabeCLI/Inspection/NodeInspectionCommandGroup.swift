@@ -121,6 +121,7 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         let snapshotArguments = try snapshotArgumentParser.parse(
             arguments: Array(arguments.dropFirst(2))
         )
+        guard snapshotArguments.semanticCapture == nil else { throw CLIError.invalidArgument("node detail requires saved capture scope") }
         guard let oid = snapshotArguments.remainingArguments.first,
               !oid.isEmpty else {
             throw CLIError.missingArgument("valid oid")
@@ -150,6 +151,7 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         let snapshotArguments = try snapshotArgumentParser.parse(
             arguments: Array(arguments.dropFirst(2))
         )
+        guard snapshotArguments.semanticCapture == nil else { throw CLIError.invalidArgument("node detail requires saved capture scope") }
         let command = try nodeDetailSummaryParser.parse(
             arguments: snapshotArguments.remainingArguments
         )
@@ -176,6 +178,7 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         let snapshotArguments = try snapshotArgumentParser.parse(
             arguments: Array(arguments.dropFirst(2))
         )
+        guard snapshotArguments.semanticCapture == nil else { throw CLIError.invalidArgument("node detail requires saved capture scope") }
         let command = try checkNodeDetailParser.parse(
             arguments: snapshotArguments.remainingArguments
         )
@@ -204,7 +207,8 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         )
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: arguments[1],
-            snapshotIdentifier: snapshotArguments.snapshotIdentifier
+            snapshotIdentifier: snapshotArguments.snapshotIdentifier,
+            semanticCapture: snapshotArguments.semanticCapture
         )
         return CLICommandResponse.success(
             command: "summarize-hierarchy",
@@ -228,7 +232,8 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
                 appId: arguments[1],
                 query: command.query,
                 cursor: command.cursor,
-                snapshotIdentifier: snapshotArguments.snapshotIdentifier
+                snapshotIdentifier: snapshotArguments.snapshotIdentifier,
+                semanticCapture: snapshotArguments.semanticCapture
             )
         )
     }
@@ -246,7 +251,8 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         )
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: appId,
-            snapshotIdentifier: snapshotArguments.snapshotIdentifier
+            snapshotIdentifier: snapshotArguments.snapshotIdentifier,
+            semanticCapture: snapshotArguments.semanticCapture
         )
         let screenInspectionBuilder = try screenInspectionBuilderRegistry.builder(
             for: resolvedHierarchy.snapshot.platform
@@ -272,6 +278,7 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
             arguments: Array(arguments.dropFirst(2))
         )
         let command = try findNodesParser.parse(arguments: snapshotArguments.remainingArguments)
+        try preflightNativeNode(appId: appId, query: command.query, snapshotArguments: snapshotArguments)
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: appId,
             snapshotIdentifier: snapshotArguments.snapshotIdentifier
@@ -310,7 +317,8 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         let command = try checkNodeParser.parse(arguments: snapshotArguments.remainingArguments)
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: appId,
-            snapshotIdentifier: snapshotArguments.snapshotIdentifier
+            snapshotIdentifier: snapshotArguments.snapshotIdentifier,
+            semanticCapture: snapshotArguments.semanticCapture
         )
         guard let node = nodeFinder.firstNodeSnapshot(
             in: resolvedHierarchy.snapshot.hierarchy,
@@ -335,6 +343,7 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
             arguments: Array(arguments.dropFirst(2))
         )
         let command = try checkStyleParser.parse(arguments: snapshotArguments.remainingArguments)
+        try preflightNativeNode(appId: appId, query: command.query, snapshotArguments: snapshotArguments)
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: appId,
             snapshotIdentifier: snapshotArguments.snapshotIdentifier
@@ -376,7 +385,8 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
         let command = try checkLayoutParser.parse(arguments: snapshotArguments.remainingArguments)
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: appId,
-            snapshotIdentifier: snapshotArguments.snapshotIdentifier
+            snapshotIdentifier: snapshotArguments.snapshotIdentifier,
+            semanticCapture: snapshotArguments.semanticCapture
         )
         var result = try layoutExpectationChecker.check(
             hierarchy: resolvedHierarchy.snapshot.hierarchy,
@@ -387,5 +397,13 @@ struct NodeInspectionCommandGroup: CLICommandHandling {
             command: "check-layout",
             data: resolvedHierarchy.addingMetadata(to: result)
         )
+    }
+    private func preflightNativeNode(appId: String, query: HierarchyNodeQuery, snapshotArguments: PageSnapshotCommandArguments) throws {
+        guard snapshotArguments.semanticCapture == nil else {
+            throw CLIError.invalidArgument("semantic inspection requires --snapshot-id from capture-hierarchy")
+        }
+        if snapshotArguments.snapshotIdentifier == nil, let oid = query.oid {
+            try nodeDetailResolver.preflightNativeNode(appId: appId, oid: oid)
+        }
     }
 }

@@ -6,10 +6,14 @@
 //
 
 import Foundation
+import AstrolabeProtocol
 
 struct PageSnapshotCommandArguments {
     /// Page snapshot identifier explicitly provided by the caller.
     let snapshotIdentifier: String?
+
+    /// Explicit semantic capture scope; nil preserves ordinary render capture.
+    let semanticCapture: RuntimeSemanticCaptureOptions?
 
     /// Arguments passed to the original command parser after removing page snapshot options.
     let remainingArguments: [String]
@@ -18,9 +22,25 @@ struct PageSnapshotCommandArguments {
 struct PageSnapshotArgumentParser {
     func parse(arguments: [String]) throws -> PageSnapshotCommandArguments {
         var snapshotIdentifier: String?
+        var includeSemantics = false
+        var windowID: RuntimeOpaqueIdentifier?
         var remainingArguments = [String]()
         var index = 0
         while index < arguments.count {
+            if arguments[index] == "--include-semantics" {
+                guard !includeSemantics else { throw CLIError.invalidArgument("duplicate include-semantics") }
+                includeSemantics = true
+                index += 1
+                continue
+            }
+            if arguments[index] == "--window-id" {
+                guard windowID == nil, index + 1 < arguments.count else {
+                    throw CLIError.missingArgument("valid window-id")
+                }
+                windowID = try RuntimeOpaqueIdentifier(rawValue: arguments[index + 1])
+                index += 2
+                continue
+            }
             guard arguments[index] == "--snapshot-id" else {
                 remainingArguments.append(arguments[index])
                 index += 1
@@ -34,8 +54,13 @@ struct PageSnapshotArgumentParser {
             snapshotIdentifier = identifier.uuidString
             index += 2
         }
+        guard windowID == nil || includeSemantics,
+              snapshotIdentifier == nil || !includeSemantics else {
+            throw CLIError.invalidArgument("capture selectors require a new semantic capture")
+        }
         return PageSnapshotCommandArguments(
             snapshotIdentifier: snapshotIdentifier,
+            semanticCapture: includeSemantics ? RuntimeSemanticCaptureOptions(windowID: windowID) : nil,
             remainingArguments: remainingArguments
         )
     }
@@ -58,6 +83,9 @@ struct ResolvedPageHierarchy {
         result["snapshotId"] = snapshot.identifier
         result["capturedAtUnixTime"] = snapshot.createdAt.timeIntervalSince1970
         result["hierarchySource"] = source.rawValue
+        for key in ["runtimeSnapshotId", "runtimeCapturedAtUnixTime", "semanticCapture"] {
+            result[key] = snapshot.hierarchy[key]
+        }
         return result
     }
 }
@@ -79,9 +107,11 @@ struct PageHierarchyResolver {
 
     func resolve(
         appId: String,
-        snapshotIdentifier: String?
+        snapshotIdentifier: String?,
+        semanticCapture: RuntimeSemanticCaptureOptions? = nil
     ) throws -> ResolvedPageHierarchy {
         if let snapshotIdentifier {
+            guard semanticCapture == nil else { throw CLIError.invalidArgument("historical snapshot cannot change capture scope") }
             return ResolvedPageHierarchy(
                 snapshot: try snapshotStore.loadHierarchy(
                     identifier: snapshotIdentifier,
@@ -91,10 +121,18 @@ struct PageHierarchyResolver {
             )
         }
 
-        var hierarchy = try service.fetchHierarchy(appId: appId)
+        var hierarchy = try service.fetchHierarchy(appId: appId, semanticCapture: semanticCapture)
         let platform = try service.platform(for: appId)
         let identifier = UUID().uuidString
         let createdAt = now()
+        if hierarchy["semanticCapture"] != nil {
+            guard hierarchy["snapshotId"] is String,
+                  hierarchy["capturedAtUnixTime"] is NSNumber else {
+                throw CLIError.invalidHierarchySnapshot
+            }
+            hierarchy["runtimeSnapshotId"] = hierarchy["snapshotId"]
+            hierarchy["runtimeCapturedAtUnixTime"] = hierarchy["capturedAtUnixTime"]
+        }
         hierarchy["appId"] = appId
         hierarchy["snapshotId"] = identifier
         hierarchy["capturedAtUnixTime"] = createdAt.timeIntervalSince1970
@@ -113,6 +151,7 @@ struct PageHierarchyResolver {
 enum PageNodeDetailSource: String {
     case liveRuntime
     case snapshotCache
+    case runtimeSnapshot
 }
 
 struct ResolvedPageNodeDetail {
@@ -122,7 +161,7 @@ struct ResolvedPageNodeDetail {
     /// Whether node details came from the Runtime or the page snapshot cache.
     let source: PageNodeDetailSource
 
-    /// Time at which node details were read.
+    /// Original Runtime capture time for semantic detail; read time for native detail.
     let capturedAt: Date
 
     /// Page snapshot identifier associated with the node details.
@@ -135,6 +174,8 @@ struct ResolvedPageNodeDetail {
         var result = data
         result["detailSource"] = source.rawValue
         result["detailCapturedAtUnixTime"] = capturedAt.timeIntervalSince1970
+        result["semanticContext"] = detail["semanticContext"]
+        result["extensions"] = detail["extensions"]
         if let snapshotIdentifier {
             result["snapshotId"] = snapshotIdentifier
             result["hierarchySource"] = PageHierarchySource.snapshot.rawValue
@@ -196,22 +237,38 @@ struct PageNodeDetailResolver {
         guard let detailOID = detailOID(for: oid, hierarchy: snapshot.hierarchy) else {
             throw CLIError.snapshotNodeNotFound
         }
+        let semantic = extractor.collectNodes(in: snapshot.hierarchy).contains {
+            $0["kind"] as? String == "semantic" && extractor.nodeIdentifier(from: $0["oid"]) == detailOID
+        }
         if let cached = try snapshotStore.loadNodeDetail(
             snapshotIdentifier: snapshot.identifier,
             appId: appId,
             oid: detailOID
         ) {
+            if semantic {
+                try validateSemanticDetail(cached.detail, oid: detailOID, snapshot: snapshot)
+                guard cached.capturedAt == (try semanticCaptureDate(snapshot)) else { throw CLIError.invalidHierarchySnapshot }
+            }
             return ResolvedPageNodeDetail(
                 detail: cached.detail,
-                source: .snapshotCache,
-                capturedAt: cached.capturedAt,
+                source: semantic ? .runtimeSnapshot : .snapshotCache,
+                capturedAt: semantic ? try semanticCaptureDate(snapshot) : cached.capturedAt,
                 snapshotIdentifier: snapshot.identifier,
                 pageCapturedAt: snapshot.createdAt
             )
         }
 
-        let detail = try service.fetchNodeDetail(appId: appId, oid: detailOID)
-        let capturedAt = now()
+        let detail: [String: Any]
+        let capturedAt: Date
+        if semantic {
+            guard let runtimeID = snapshot.hierarchy["runtimeSnapshotId"] as? String else { throw CLIError.invalidHierarchySnapshot }
+            detail = try service.fetchNodeDetail(appId: appId, oid: detailOID, runtimeSnapshotID: runtimeID)
+            try validateSemanticDetail(detail, oid: detailOID, snapshot: snapshot)
+            capturedAt = try semanticCaptureDate(snapshot)
+        } else {
+            detail = try service.fetchNodeDetail(appId: appId, oid: detailOID)
+            capturedAt = now()
+        }
         try snapshotStore.saveNodeDetail(PageNodeDetailSnapshot(
             snapshotIdentifier: snapshot.identifier,
             appId: appId,
@@ -221,11 +278,34 @@ struct PageNodeDetailResolver {
         ))
         return ResolvedPageNodeDetail(
             detail: detail,
-            source: .liveRuntime,
+            source: semantic ? .runtimeSnapshot : .liveRuntime,
             capturedAt: capturedAt,
             snapshotIdentifier: snapshot.identifier,
             pageCapturedAt: snapshot.createdAt
         )
+    }
+
+    func preflightNativeNode(appId: String, oid: String) throws {
+        try service.preflightNativeNode(appId: appId, oid: oid)
+    }
+
+    private func semanticCaptureDate(_ snapshot: PageHierarchySnapshot) throws -> Date {
+        guard let time = extractor.numericValue(from: snapshot.hierarchy["runtimeCapturedAtUnixTime"]), time.isFinite else { throw CLIError.invalidHierarchySnapshot }
+        return Date(timeIntervalSince1970: time)
+    }
+
+    private func validateSemanticDetail(_ detail: [String: Any], oid: String, snapshot: PageHierarchySnapshot) throws {
+        guard let contextObject = detail["semanticContext"] as? [String: Any],
+              let runtimeID = snapshot.hierarchy["runtimeSnapshotId"] as? String,
+              JSONSerialization.isValidJSONObject(contextObject),
+              detail["resolvedOid"] as? String == oid,
+              let source = (snapshot.hierarchy["semanticCapture"] as? [String: Any])?["source"] as? String,
+              let context = try? JSONDecoder().decode(RuntimeSemanticDetailContext.self, from: JSONSerialization.data(withJSONObject: contextObject)),
+              context.snapshotID.rawValue == runtimeID,
+              context.source.rawValue == source,
+              context.capturedAtUnixTime == (try semanticCaptureDate(snapshot)).timeIntervalSince1970 else {
+            throw CLIError.invalidHierarchySnapshot
+        }
     }
 
     private func detailOID(for requestedOID: String, hierarchy: [String: Any]) -> String? {

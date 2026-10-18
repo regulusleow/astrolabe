@@ -58,11 +58,15 @@ package final class HostPlatformModuleRegistry: RuntimeUIInspecting {
     }
 
     package func fetchHierarchy(appId: String) throws -> [String: Any] {
+        try fetchHierarchy(appId: appId, semanticCapture: nil)
+    }
+
+    package func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
         let module = try module(for: appId)
         guard let provider = module.hierarchyCapture else {
             throw unsupportedCapability(.hierarchy, appId: appId, module: module)
         }
-        return try provider.fetchHierarchy(appId: appId)
+        return try provider.fetchHierarchy(appId: appId, semanticCapture: semanticCapture)
     }
 
     package func fetchNodeDetail(appId: String, oid: String) throws -> [String: Any] {
@@ -71,6 +75,20 @@ package final class HostPlatformModuleRegistry: RuntimeUIInspecting {
             throw unsupportedCapability(.nodeDetail, appId: appId, module: module)
         }
         return try provider.fetchNodeDetail(appId: appId, oid: oid)
+    }
+
+    package func preflightNativeNode(appId: String, oid: String) throws {
+        let module = try module(for: appId)
+        guard let provider = module.nodeDetailProvider else {
+            throw unsupportedCapability(.nodeDetail, appId: appId, module: module)
+        }
+        try provider.preflightNativeNode(appId: appId, oid: oid)
+    }
+
+    package func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+        let module = try module(for: appId)
+        guard let provider = module.nodeDetailProvider else { throw unsupportedCapability(.nodeDetail, appId: appId, module: module) }
+        return try provider.fetchNodeDetail(appId: appId, oid: oid, runtimeSnapshotID: runtimeSnapshotID)
     }
 
     package func fetchNodeDetails(

@@ -115,19 +115,41 @@ package final class AstrolabeRuntimeClientSession {
         }
     }
 
-    package func hierarchySnapshot() throws -> RuntimeHierarchySnapshotPayload {
+    package func hierarchySnapshot(semanticCapture: RuntimeSemanticCaptureOptions? = nil) throws -> RuntimeHierarchySnapshotPayload {
         try compatibilityPolicy.require(.hierarchy, compatibility: compatibility)
-        let snapshot = try client.hierarchySnapshot()
+        if semanticCapture != nil { try requireSemanticInspection() }
+        let snapshot = try client.hierarchySnapshot(semanticCapture: semanticCapture)
+        guard semanticCapture == nil || snapshot.semanticCapture != nil else {
+            throw AstrolabeRuntimeClientError.invalidResponse("Semantic capture response is missing semanticCapture")
+        }
+        if let requestedWindow = semanticCapture?.windowID,
+           snapshot.semanticCapture?.windowID != requestedWindow {
+            throw AstrolabeRuntimeClientError.invalidResponse("Semantic capture response changed the requested window")
+        }
         didCaptureHierarchy = true
         return snapshot
     }
 
     package func nodeDetail(
-        nodeID: RuntimeOpaqueIdentifier
+        nodeID: RuntimeOpaqueIdentifier,
+        snapshotID: RuntimeOpaqueIdentifier? = nil
     ) throws -> RuntimeNodeDetailPayload {
         try compatibilityPolicy.require(.nodeDetail, compatibility: compatibility)
-        try captureHierarchyIfNeeded()
-        return try client.nodeDetail(nodeID: nodeID)
+        if snapshotID != nil {
+            try requireSemanticInspection()
+        } else if !compatibility.runtimeCapabilities.contains(.semanticInspection) {
+            try captureHierarchyIfNeeded()
+        }
+        let detail = try client.nodeDetail(nodeID: nodeID, snapshotID: snapshotID)
+        guard snapshotID != nil || detail.semanticContext == nil else {
+            throw AstrolabeRuntimeClientError.invalidResponse("Semantic detail requires a saved page snapshot context")
+        }
+        return detail
+    }
+
+    package func preflightNativeNode(nodeID: RuntimeOpaqueIdentifier) throws {
+        guard compatibility.runtimeCapabilities.contains(.semanticInspection) else { return }
+        _ = try nodeDetail(nodeID: nodeID)
     }
 
     package func applyAttributePatch(
@@ -190,6 +212,12 @@ package final class AstrolabeRuntimeClientSession {
     private func captureHierarchyIfNeeded() throws {
         if !didCaptureHierarchy {
             _ = try hierarchySnapshot()
+        }
+    }
+
+    private func requireSemanticInspection() throws {
+        guard compatibility.runtimeCapabilities.contains(.semanticInspection) else {
+            throw AstrolabeRuntimeClientError.remote(RuntimeError(code: .capabilityUnavailable, message: "Runtime does not advertise semanticInspection", recoverySuggestion: "Update the target Runtime"))
         }
     }
 }

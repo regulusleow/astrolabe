@@ -33,7 +33,11 @@ struct SemanticRoleAnnotatingRuntimeUIInspector: RuntimeUIInspecting {
     }
 
     func fetchHierarchy(appId: String) throws -> [String: Any] {
-        let hierarchy = try base.fetchHierarchy(appId: appId)
+        try fetchHierarchy(appId: appId, semanticCapture: nil)
+    }
+
+    func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
+        let hierarchy = try base.fetchHierarchy(appId: appId, semanticCapture: semanticCapture)
         let platform = try base.platform(for: appId)
         guard let displayItems = hierarchy["displayItems"] else {
             return hierarchy
@@ -54,6 +58,14 @@ struct SemanticRoleAnnotatingRuntimeUIInspector: RuntimeUIInspecting {
 
     func fetchNodeDetail(appId: String, oid: String) throws -> [String: Any] {
         try base.fetchNodeDetail(appId: appId, oid: oid)
+    }
+
+    func preflightNativeNode(appId: String, oid: String) throws {
+        try base.preflightNativeNode(appId: appId, oid: oid)
+    }
+
+    func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+        try base.fetchNodeDetail(appId: appId, oid: oid, runtimeSnapshotID: runtimeSnapshotID)
     }
 
     func fetchNodeDetails(appId: String, oids: [String]) throws -> RuntimeNodeDetailBatch {

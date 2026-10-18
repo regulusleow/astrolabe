@@ -22,11 +22,11 @@ struct HierarchyNodeRecord {
 }
 
 struct HierarchyNodeVisibility {
-    /// Whether the node and its ancestors' hidden and alpha states permit display.
-    let hierarchyVisible: Bool
+    /// Whether render hidden/alpha states permit display; nil for semantic observations.
+    let hierarchyVisible: Bool?
 
-    /// Onscreen visibility computed by the Runtime from screen intersection and ancestor clipping.
-    let onscreen: Bool
+    /// Runtime render visibility; semantic AX geometry does not prove this fact.
+    let onscreen: Bool?
 }
 
 struct HierarchyNodeExtractor {
@@ -34,18 +34,26 @@ struct HierarchyNodeExtractor {
     private let semanticRoleClassifier = NodeSemanticRoleClassifier()
 
     func collectNodes(in hierarchy: [String: Any]) -> [[String: Any]] {
-        collectNodes(from: hierarchy["displayItems"])
+        collectNodes(from: hierarchy["displayItems"]) + collectNodes(from: hierarchy["semanticItems"])
     }
 
     func collectNodeRecords(in hierarchy: [String: Any]) -> [HierarchyNodeRecord] {
         collectNodeRecords(from: hierarchy["displayItems"], parentPath: "", depth: 0)
+            + collectNodeRecords(from: hierarchy["semanticItems"], parentPath: "semantic", depth: 0)
     }
 
     func isVisibleNode(_ node: [String: Any]) -> Bool {
-        visibility(from: node).onscreen
+        visibility(from: node).onscreen == true
     }
 
     func nodeSnapshot(from node: [String: Any]) -> [String: Any] {
+        if node["kind"] as? String == "semantic" {
+            var result = node
+            result.removeValue(forKey: "subitems")
+            result["text"] = text(from: node)
+            result["semanticRoles"] = semanticRoles(from: node).map(\.rawValue).sorted()
+            return result
+        }
         let visibility = visibility(from: node)
         var snapshot: [String: Any] = [
             "oid": nodeIdentifier(from: node["oid"]) ?? "",
@@ -55,9 +63,9 @@ struct HierarchyNodeExtractor {
             "className": node["className"] as? String ?? "",
             "frame": node["frame"] ?? [:],
             "bounds": node["bounds"] ?? [:],
-            "visible": visibility.onscreen,
-            "onscreen": visibility.onscreen,
-            "hierarchyVisible": visibility.hierarchyVisible,
+            "visible": visibility.onscreen == true,
+            "onscreen": visibility.onscreen == true,
+            "hierarchyVisible": visibility.hierarchyVisible == true,
             "hidden": node["hidden"] as? Bool ?? false,
             "inHiddenHierarchy": node["inHiddenHierarchy"] as? Bool ?? false,
             "alpha": numericValue(from: node["alpha"]) ?? 1,
@@ -91,6 +99,7 @@ struct HierarchyNodeExtractor {
     }
 
     func visibility(from node: [String: Any]) -> HierarchyNodeVisibility {
+        if node["kind"] as? String == "semantic" { return HierarchyNodeVisibility(hierarchyVisible: nil, onscreen: nil) }
         let hidden = node["hidden"] as? Bool ?? false
         let hiddenByAncestor = node["inHiddenHierarchy"] as? Bool ?? false
         let effectiveAlpha = numericValue(from: node["effectiveAlpha"])

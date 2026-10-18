@@ -52,6 +52,15 @@ enum CLICommandTestFixtures {
         /// Hierarchy JSON returned by the capture-hierarchy stub.
         var hierarchy: [String: Any] = [:]
 
+        /// Most recent explicit semantic capture options received by the fake Provider.
+        var semanticCaptureOptions: RuntimeSemanticCaptureOptions?
+
+        /// Request-only native preflight failure used by opaque-ID command regressions.
+        var nativePreflightError: Error?
+
+        /// Number of native preflights requested before any hierarchy capture.
+        var nativePreflightCount = 0
+
         /// Attribute JSON returned by the node-detail stub.
         var detail: [String: Any] = [:]
 
@@ -97,9 +106,23 @@ enum CLICommandTestFixtures {
             return hierarchy
         }
 
+        func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
+            semanticCaptureOptions = semanticCapture
+            return try fetchHierarchy(appId: appId)
+        }
+
         func fetchNodeDetail(appId: String, oid: String) throws -> [String: Any] {
             calls.append(.fetchNodeDetail(appId, oid))
             return detailsByOid[oid] ?? detail
+        }
+
+        func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+            try fetchNodeDetail(appId: appId, oid: oid)
+        }
+
+        func preflightNativeNode(appId: String, oid: String) throws {
+            nativePreflightCount += 1
+            if let nativePreflightError { throw nativePreflightError }
         }
 
         func applyAttributePatch(

@@ -35,6 +35,8 @@ struct NodeDetailSummaryBuilder {
             "attributeCount": filteredAttributes.count,
             "attributes": filteredAttributes
         ]
+        summary["semanticContext"] = detail["semanticContext"]
+        summary["extensions"] = detail["extensions"]
         let semanticAttributes = semanticAttributes(from: filteredAttributes)
         if !semanticAttributes.isEmpty {
             summary["semanticAttributes"] = semanticAttributes
@@ -64,7 +66,8 @@ struct NodeDetailSummaryBuilder {
                         appId: appId,
                         groupIdentifier: groupIdentifier,
                         groupTitle: groupTitle,
-                        sectionIdentifier: sectionIdentifier
+                        sectionIdentifier: sectionIdentifier,
+                        isSemanticDetail: detail["semanticContext"] != nil
                     ))
                 }
             }
@@ -77,7 +80,8 @@ struct NodeDetailSummaryBuilder {
         appId: String,
         groupIdentifier: String,
         groupTitle: String,
-        sectionIdentifier: String
+        sectionIdentifier: String,
+        isSemanticDetail: Bool
     ) -> [String: Any] {
         let identifier = attribute["identifier"] as? String ?? ""
         let path = [groupIdentifier, sectionIdentifier, identifier]
@@ -106,7 +110,12 @@ struct NodeDetailSummaryBuilder {
            !semanticPath.isEmpty {
             result["semanticPath"] = semanticPath
         }
-        if let semantics = semanticMapper.semantics(
+        if isSemanticDetail,
+           let semanticPath = attribute["semanticPath"] as? String,
+           semanticPath.hasPrefix("common.text.") {
+            let field = String(semanticPath.dropFirst("common.text.".count))
+            result["semanticName"] = field == "color" ? "textColor" : field == "content" ? "text" : field
+        } else if let semantics = semanticMapper.semantics(
             forIdentifier: identifier,
             appId: appId
         ) {

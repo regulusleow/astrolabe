@@ -5,6 +5,8 @@
 //  Created by 轩辕十四 on 2026/7/14.
 //
 
+import AstrolabeProtocol
+
 struct HierarchyNodeSearchWorkflow {
     private let hierarchyResolver: PageHierarchyResolver
     private let nodeFinder: HierarchyNodeFinder
@@ -24,9 +26,11 @@ struct HierarchyNodeSearchWorkflow {
         appId: String,
         query: HierarchyNodeQuery,
         cursor: String?,
-        snapshotIdentifier: String?
+        snapshotIdentifier: String?,
+        semanticCapture: RuntimeSemanticCaptureOptions? = nil
     ) throws -> [String: Any] {
         if let cursor {
+            guard semanticCapture == nil else { throw CLIError.invalidArgument("pagination cursor cannot change capture scope") }
             let identifier = try nodeFinder.snapshotIdentifier(from: cursor)
             let snapshot = try snapshotStore.load(identifier: identifier)
             guard snapshot.appId == appId else {
@@ -43,7 +47,8 @@ struct HierarchyNodeSearchWorkflow {
 
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: appId,
-            snapshotIdentifier: snapshotIdentifier
+            snapshotIdentifier: snapshotIdentifier,
+            semanticCapture: semanticCapture
         )
         let snapshot = nodeFinder.makeSearchSnapshot(
             in: resolvedHierarchy.snapshot.hierarchy,
@@ -57,6 +62,6 @@ struct HierarchyNodeSearchWorkflow {
         if result["hasMore"] as? Bool == true {
             try snapshotStore.save(snapshot)
         }
-        return result
+        return resolvedHierarchy.addingMetadata(to: result)
     }
 }

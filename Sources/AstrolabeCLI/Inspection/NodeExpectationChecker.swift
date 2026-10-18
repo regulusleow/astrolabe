@@ -42,12 +42,17 @@ struct NodeExpectationChecker {
 
         if let expected = expectation.visible {
             checkedCount += 1
-            let actual = node["visible"] as? Bool ?? false
+            let actual: Bool?
+            if node["kind"] as? String == "semantic" {
+                actual = node["visible"] as? Bool
+            } else {
+                actual = node["visible"] as? Bool ?? false
+            }
             appendFailureIfNeeded(
                 to: &failures,
                 field: "visible",
                 expected: expected,
-                actual: actual,
+                actual: actual.map { $0 as Any } ?? "unknown",
                 passed: actual == expected
             )
         }

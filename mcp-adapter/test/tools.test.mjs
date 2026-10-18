@@ -28,6 +28,32 @@ const expectedToolNames = [
   "check_layout"
 ].sort();
 
+test("semantic capture scope reaches existing capture tools without adding tools", async () => {
+  const server = new FakeServer();
+  const calls = [];
+  registerInspectorTools(server, "/tmp/astrolabe", async (_bin, args) => { calls.push(args); return successResult({}); });
+  for (const tool of ["capture_hierarchy", "summarize_hierarchy", "inspect_screen", "find_nodes"]) {
+    assert.ok(server.configs.get(tool).inputSchema.includeSemantics, tool);
+    assert.ok(server.configs.get(tool).inputSchema.windowId, tool);
+    await server.handlers.get(tool)({ appId: "app", includeSemantics: true, windowId: "window-2" });
+    assert.ok(calls.at(-1).includes("--include-semantics"), tool);
+    assert.deepEqual(calls.at(-1).slice(calls.at(-1).indexOf("--window-id"), calls.at(-1).indexOf("--window-id") + 2), ["--window-id", "window-2"]);
+  }
+});
+
+test("typed target diagnostics and semantic contexts survive MCP envelopes", async () => {
+  const server = new FakeServer();
+  const extensions = { "common.inspectionTargets": [{ windowID: "window-2", runtimeType: { name: "UIWindow", ancestors: [] } }] };
+  registerInspectorTools(server, "/tmp/astrolabe", async () => ({
+    exitedSuccessfully: false, stdout: "", stderr: "",
+    envelope: { schemaVersion: 4, command: "capture-hierarchy", success: false, errorCode: "astrolabe_runtime_inspection.targetAmbiguous", error: "Ambiguous", recoverySuggestion: "Choose windowId", extensions }
+  }));
+  const response = await server.handlers.get("capture_hierarchy")({ appId: "app", includeSemantics: true });
+  assert.deepEqual(response.structuredContent.extensions, extensions);
+  assert.ok(server.configs.get("capture_hierarchy").outputSchema.extensions);
+  assert.equal(response.structuredContent.data, undefined);
+});
+
 test("MCP keeps the 23 platform-neutral tool names and advertises output envelopes", () => {
   const server = new FakeServer();
   registerInspectorTools(server, "/tmp/astrolabe", async () => successResult({}));

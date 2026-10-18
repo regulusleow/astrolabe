@@ -30,7 +30,7 @@ struct RuntimeUIGraphSnapshotAdapter {
         do {
             return RuntimeUIGraphSnapshotInput(
                 snapshotIdentifier: snapshot.identifier,
-                roots: try rootObjects.map(nodeInput),
+                roots: try (rootObjects + (hierarchy["semanticItems"] as? [[String: Any]] ?? [])).map(nodeInput),
                 canonicalRelations: try relationObjects.map(relation)
             )
         } catch let error as RuntimeUIGraphError {

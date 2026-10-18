@@ -29,6 +29,12 @@ type NodeSemanticRole = typeof semanticRoleValues[number];
 const snapshotIdSchema = z.string().uuid().optional().describe(
   "snapshotId returned by a hierarchy tool; when provided, use that page snapshot without recapturing the current hierarchy"
 );
+const semanticCaptureSchema = {
+  /** Whether this new capture explicitly includes typed semantic facts. */
+  includeSemantics: z.boolean().optional().describe("Explicitly capture typed semantic facts when semanticInspection is advertised; absent or false keeps render capture"),
+  /** Optional process-scoped Runtime target window for a semantic capture. */
+  windowId: z.string().min(1).optional().describe("Runtime window ID; requires includeSemantics=true and a new capture without snapshotId")
+};
 const screenshotSourceSchema = z.enum(["auto", "virtual", "physical"]).optional().describe(
   "Platform-neutral screenshot source; auto selects by app connection kind, virtual means a virtual device, and physical means a physical device"
 );
@@ -242,13 +248,15 @@ export function registerInspectorTools(
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
         snapshotId: snapshotIdSchema,
+        ...semanticCaptureSchema,
         nodeLimit: z.number().int().min(1).max(200).optional().describe("Maximum number of returned nodes; defaults to 25 and cannot exceed 200"),
         maxDepth: z.number().int().min(0).optional().describe("Maximum returned hierarchy depth; the root depth is 0")
       }
     },
-    async ({ appId, snapshotId, nodeLimit, maxDepth }) => {
+    async ({ appId, snapshotId, nodeLimit, maxDepth, includeSemantics, windowId }) => {
       const args = ["capture-hierarchy", appId, "--node-limit", String(nodeLimit ?? 25)];
       appendSnapshotId(args, snapshotId);
+      appendSemanticCapture(args, includeSemantics, windowId);
       if (maxDepth !== undefined) {
         args.push("--max-depth", String(maxDepth));
       }
@@ -598,7 +606,7 @@ export function registerInspectorTools(
     "node_detail",
     {
       title: "Read Node Details",
-      description: "Read details for a UI node. With snapshotId, first verify that the node belongs to the snapshot and prefer cached snapshot details, requesting the Runtime by the original detailOid only when details are absent.",
+      description: "Read details for a UI node. With snapshotId, verify membership and prefer cached details. Semantic detail requires that saved page and queries its original frozen Runtime capture on cache miss; native details retain live behavior.",
       outputSchema: inspectorToolOutputSchema,
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
@@ -710,12 +718,14 @@ export function registerInspectorTools(
       outputSchema: inspectorToolOutputSchema,
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
-        snapshotId: snapshotIdSchema
+        snapshotId: snapshotIdSchema,
+        ...semanticCaptureSchema
       }
     },
-    async ({ appId, snapshotId }) => {
+    async ({ appId, snapshotId, includeSemantics, windowId }) => {
       const args = ["summarize-hierarchy", appId];
       appendSnapshotId(args, snapshotId);
+      appendSemanticCapture(args, includeSemantics, windowId);
       args.push("--json");
       return toolResponse(await inspectorRunner(inspectorBin, args));
     }
@@ -730,13 +740,15 @@ export function registerInspectorTools(
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
         snapshotId: snapshotIdSchema,
+        ...semanticCaptureSchema,
         targetLimit: z.number().int().min(1).max(100).optional().describe("Maximum number of recommended follow-up nodes; defaults to 12"),
         classLimit: z.number().int().min(1).max(100).optional().describe("Maximum number of classes in statistics; defaults to 12")
       }
     },
-    async ({ appId, snapshotId, targetLimit, classLimit }) => {
+    async ({ appId, snapshotId, targetLimit, classLimit, includeSemantics, windowId }) => {
       const args = ["inspect-screen", appId];
       appendSnapshotId(args, snapshotId);
+      appendSemanticCapture(args, includeSemantics, windowId);
       if (targetLimit) {
         args.push("--target-limit", String(targetLimit));
       }
@@ -757,6 +769,7 @@ export function registerInspectorTools(
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
         snapshotId: snapshotIdSchema,
+        ...semanticCaptureSchema,
         oid: z.string().min(1).optional().describe("Opaque node ID to match exactly"),
         className: z.string().min(1).optional().describe("className substring to match, such as UILabel"),
         text: z.string().min(1).optional().describe("Text substring to match"),
@@ -766,9 +779,10 @@ export function registerInspectorTools(
         cursor: z.string().min(1).max(4096).optional().describe("Complete nextCursor returned by the previous page; subsequent pages read the same frozen snapshot, and appId and query filters must remain unchanged")
       }
     },
-    async ({ appId, snapshotId, oid, className, text, semanticRole, visibleOnly, limit, cursor }) => {
+    async ({ appId, snapshotId, oid, className, text, semanticRole, visibleOnly, limit, cursor, includeSemantics, windowId }) => {
       const args = ["find-nodes", appId];
       appendSnapshotId(args, snapshotId);
+      appendSemanticCapture(args, includeSemantics, windowId);
       appendNodeQueryArgs(args, { oid, className, text, semanticRole, visibleOnly, limit });
       if (cursor) {
         args.push("--cursor", cursor);
@@ -782,7 +796,7 @@ export function registerInspectorTools(
     "inspect_node",
     {
       title: "Inspect Matching Node Details",
-      description: "Find the first matching UI node and read its details. With snapshotId, locate the node only in that snapshot and read details on demand from cache or the same Runtime object.",
+      description: "Find the first matching UI node and read its details. Semantic nodes require snapshotId and retain the original frozen Runtime capture. Without snapshotId, an exact oid on a semantic-capable Runtime must pass a direct native detail read before automatic hierarchy capture; refusals never recapture UI.",
       outputSchema: inspectorToolOutputSchema,
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
@@ -888,6 +902,11 @@ export function registerInspectorTools(
       return toolResponse(await inspectorRunner(inspectorBin, args));
     }
   );
+}
+
+function appendSemanticCapture(args: string[], includeSemantics?: boolean, windowId?: string): void {
+  if (includeSemantics) args.push("--include-semantics");
+  if (windowId !== undefined) args.push("--window-id", windowId);
 }
 
 function appendSnapshotId(args: string[], snapshotId: string | undefined): void {

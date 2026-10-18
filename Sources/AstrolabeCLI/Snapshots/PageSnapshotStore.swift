@@ -34,7 +34,7 @@ struct PageNodeDetailSnapshot {
     /// Runtime node-detail identifier.
     let oid: String
 
-    /// Time at which node details were read.
+    /// Original Runtime capture time for semantic detail; read time for native detail.
     let capturedAt: Date
 
     /// Node details returned by the Runtime UI Provider.

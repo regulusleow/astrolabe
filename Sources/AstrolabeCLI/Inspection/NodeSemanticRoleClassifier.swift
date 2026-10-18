@@ -38,6 +38,11 @@ package protocol NodeSemanticRoleClassifying {
 
 struct NodeSemanticRoleClassifier: NodeSemanticRoleClassifying {
     func roles(for node: [String: Any]) -> Set<NodeSemanticRole> {
+        if node["kind"] as? String == "semantic" {
+            guard let runtimeRole = node["runtimeRole"] as? String,
+                  let role = NodeSemanticRole(rawValue: runtimeRole) else { return [] }
+            return [role]
+        }
         let classNames = classNames(from: node).map { $0.lowercased() }
         let classText = classNames.joined(separator: " ")
         let semanticText = semanticStrings(from: node).joined(separator: " ").lowercased()

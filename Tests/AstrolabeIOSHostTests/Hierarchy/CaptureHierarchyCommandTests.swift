@@ -15,6 +15,20 @@ import UniformTypeIdentifiers
 private typealias Fixtures = CLICommandTestFixtures
 
 final class CaptureHierarchyCommandTests: XCTestCase {
+    func testSemanticWrapperUsesOnlyRuntimeRoleAcrossBothTreeBranches() throws {
+        let service = Fixtures.FakeInspectorService()
+        let button: [String: Any] = ["oid": "button-1", "className": "SwiftUI.AXNode", "kind": "semantic", "runtimeRole": "button", "customDisplayTitle": "01:30", "semanticRoles": ["button", "timer", "text"], "subitems": []]
+        let unknown: [String: Any] = ["oid": "unknown-1", "className": "SwiftUI.AvatarNode", "kind": "semantic", "runtimeRole": "vendor.unknown", "customDisplayTitle": "avatar", "semanticRoles": ["avatar", "image"], "subitems": []]
+        for branch in ["displayItems", "semanticItems"] {
+            service.hierarchy = [branch: [button, unknown]]
+            let capture = try Fixtures.makeRunner(service: service).runJSON(arguments: ["capture-hierarchy", "app-1"])
+            let nodes = try XCTUnwrap((capture["data"] as? [String: Any])?[branch] as? [[String: Any]])
+            XCTAssertEqual(nodes[0]["semanticRoles"] as? [String], ["button"], branch)
+            XCTAssertEqual(nodes[1]["semanticRoles"] as? [String], [], branch)
+            XCTAssertEqual(nodes[1]["runtimeRole"] as? String, "vendor.unknown", branch)
+        }
+    }
+
     func testNativeCommonTextRetainsExistingPlatformSemanticPath() throws {
         let service = Fixtures.FakeInspectorService()
         service.detail = ["attributeGroups": [["identifier": "common.text", "sections": [["identifier": "properties", "attributes": [["identifier": "fontSize", "semanticPath": "common.text.fontSize", "attrTypeName": "number", "value": 28]]]]]]]

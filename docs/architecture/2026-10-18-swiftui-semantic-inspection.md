@@ -115,6 +115,8 @@ UIView/CALayer 实时详情继续走原 provider，不承诺因此冻结所有�
 - --snapshot-id 读取历史时不允许混入新的目标选择/采集参数；冻结范围不能被修改。语义 inspect-node 必须有 Host page snapshot 上下文，不能暗中重新抓当前页面。
 - Mapper 在 Host 改写 snapshotId 之前保存 runtimeSnapshotId 与 runtimeCapturedAtUnixTime；两种 ID、Host 保存时间及 Runtime 捕获时间不能混用。
 - 映射语义节点为 kind=semantic，保留真实 runtimeType/runtimeRole、AX 区域及来源；不填 visible=true、alpha=1、bounds 或假的 UIKit 类名。可读来源分支命名 semanticItems，与 displayItems 的渲染事实分开；搜索/检查/图的相应入口显式消费二者。
+- 语义角色筛选只映射已知 runtimeRole，不从 AX 标签、类名或旧角色集合追加 timer/avatar 等领域猜测；未知开放 role 原样保留，不强行纳入 Host 已知角色。原生节点的既有领域分类不变。
+- nodeID 不透明。新能力 Runtime 的无页面 exact-oid 检查先仅请求 nodeDetail，不自动捕获；Runtime 拒绝或返回未绑定 semanticContext 时立即结束。只有 native 成功才继续原生投影；未知 ID 不以重抓补 registry。旧能力目标按原流程分派，不依赖 ID 命名。
 - 语义详情 cache miss 使用保存的 runtimeSnapshotId；校验返回 semanticContext 的 snapshotID、nodeID 和时间，再写入 Host 缓存。新增 detailSource=runtimeSnapshot；capturedAt 使用原捕获时间，不用查询时刻。
 - Host 转发 typed semanticContext 与现有 detail.extensions；不丢失候选或来源。样式缺失/歧义必须表现为不可验证，不由默认值通过检查。
 - 若明确选定的窗口被其他窗口覆盖，整屏截图仍可能是上层窗口；不得据此宣称截图与目标节点一一对应。

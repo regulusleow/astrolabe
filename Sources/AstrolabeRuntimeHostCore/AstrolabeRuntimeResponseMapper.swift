@@ -34,6 +34,12 @@ package struct AstrolabeRuntimeResponseMapper {
             }
         ]
         result["relations"] = snapshot.relations?.map(relationDictionary)
+        if let capture = snapshot.semanticCapture {
+            var metadata = encodedObject(capture)
+            metadata.removeValue(forKey: "roots")
+            result["semanticCapture"] = metadata
+            result["semanticItems"] = capture.roots.map { semanticDictionary($0, source: capture.source.rawValue, depth: 0) }
+        }
         return result
     }
 
@@ -42,12 +48,47 @@ package struct AstrolabeRuntimeResponseMapper {
         requestedNodeID: RuntimeOpaqueIdentifier,
         detail: RuntimeNodeDetailPayload
     ) -> [String: Any] {
-        [
+        var result: [String: Any] = [
             "appId": appID,
             "requestedOid": requestedNodeID.rawValue,
             "resolvedOid": detail.nodeID.rawValue,
             "attributeGroups": detail.sections.map(attributeGroup)
         ]
+        result["semanticContext"] = detail.semanticContext.map(encodedObject)
+        result["extensions"] = detail.extensions?.values.mapValues(valueMapper.jsonValue)
+        return result
+    }
+
+    private func encodedObject<Value: Encodable>(_ value: Value) -> [String: Any] {
+        // These already validated Wire values have the same JSON representation in Host snapshots.
+        do {
+            return try JSONSerialization.jsonObject(with: JSONEncoder().encode(value)) as? [String: Any] ?? [:]
+        } catch {
+            preconditionFailure("Validated semantic value could not encode")
+        }
+    }
+
+    private func semanticDictionary(_ node: RuntimeSemanticNode, source: String, depth: Int) -> [String: Any] {
+        var result: [String: Any] = [
+            "oid": node.nodeID.rawValue,
+            "detailOid": node.nodeID.rawValue,
+            "kind": "semantic",
+            "className": node.runtimeType.name,
+            "runtimeType": encodedObject(node.runtimeType),
+            "runtimeRole": node.role,
+            "source": source,
+            "semanticRoles": NodeSemanticRole(rawValue: node.role).map { [$0.rawValue] } ?? [],
+            "indentLevel": depth,
+            "siblingIndex": node.siblingIndex,
+            "supportedDetailCategories": node.availableDetailCategories.map(\.rawValue),
+            "subitems": node.children.map { semanticDictionary($0, source: source, depth: depth + 1) }
+        ]
+        result["parentOid"] = node.parentID?.rawValue
+        result["frame"] = node.frameInScreen.map(valueMapper.rect)
+        result["frameInScreen"] = node.frameInScreen.map(encodedObject)
+        result["accessibility"] = node.accessibility.map(accessibilityDictionary)
+        result["customDisplayTitle"] = node.accessibility?.label
+        return result
     }
 
     package func attributePatch(

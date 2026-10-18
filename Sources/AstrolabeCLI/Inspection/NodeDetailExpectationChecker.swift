@@ -10,7 +10,7 @@ import Foundation
 struct NodeDetailExpectationChecker {
     func check(summary: [String: Any], expectation: NodeDetailExpectation) -> [String: Any] {
         guard let attribute = matchingAttribute(in: summary, expectation: expectation) else {
-            return [
+            var result: [String: Any] = [
                 "passed": false,
                 "checkedCount": 1,
                 "failures": [
@@ -21,6 +21,8 @@ struct NodeDetailExpectationChecker {
                     ]
                 ]
             ]
+            if summary["semanticContext"] != nil { result["verification"] = "unableToVerify" }
+            return result
         }
 
         guard let expectedValue = expectation.expectedValue else {
@@ -32,7 +34,7 @@ struct NodeDetailExpectationChecker {
             ]
         }
 
-        let actualValues = comparableValues(from: attribute)
+        let actualValues = comparableValues(from: attribute, isSemanticDetail: summary["semanticContext"] != nil)
         let actualValue = actualValues.first ?? ""
         let passed = valueMatches(actualValues: actualValues, expected: expectedValue, expectation: expectation)
         return [
@@ -67,25 +69,31 @@ struct NodeDetailExpectationChecker {
                 .map { $0.lowercased() }
         }
 
-        if let exactMatch = attributes.first(where: { attribute in
+        let exactMatches = attributes.filter { attribute in
             candidates(for: attribute).contains(query)
-        }) {
-            return exactMatch
         }
-
-        return attributes.first { attribute in
+        let matches = exactMatches.isEmpty ? attributes.filter { attribute in
             candidates(for: attribute).contains { $0.contains(query) }
-        }
+        } : exactMatches
+        guard summary["semanticContext"] == nil || matches.count == 1 else { return nil }
+        return matches.first
     }
 
-    private func comparableValues(from attribute: [String: Any]) -> [String] {
-        [
+    private func comparableValues(from attribute: [String: Any], isSemanticDetail: Bool) -> [String] {
+        var values = [
             attribute["valuePreview"],
             attribute["colorHex"],
             attribute["extraValuePreview"]
         ]
             .compactMap { $0 as? String }
             .filter { !$0.isEmpty }
+        if isSemanticDetail,
+           attribute["attrTypeName"] as? String == "measurement",
+           let measurement = attribute["value"] as? [String: Any],
+           let value = measurement["value"] as? NSNumber {
+            values.insert(value.stringValue, at: 0)
+        }
+        return values
     }
 
     private func valueMatches(actualValues: [String], expected: String, expectation: NodeDetailExpectation) -> Bool {

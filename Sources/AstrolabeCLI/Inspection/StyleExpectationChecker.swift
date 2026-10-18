@@ -30,13 +30,15 @@ struct StyleExpectationChecker {
             )
             let attribute = result["attribute"] as? [String: Any]
             let passed = result["passed"] as? Bool ?? false
-            checks.append([
+            var check: [String: Any] = [
                 "attribute": expectation.attribute,
                 "expected": expectation.expectedValue,
                 "actual": actualValue(from: attribute, fallback: result),
                 "passed": passed,
                 "semanticPath": attribute?["semanticPath"] as? String ?? NSNull()
-            ])
+            ]
+            check["verification"] = result["verification"]
+            checks.append(check)
 
             let resultFailures = result["failures"] as? [[String: Any]] ?? []
             for failure in resultFailures {
@@ -46,13 +48,15 @@ struct StyleExpectationChecker {
             }
         }
 
-        return [
+        var result: [String: Any] = [
             "passed": failures.isEmpty,
             "checkedCount": command.expectations.count,
             "failures": failures,
             "checks": checks,
             "node": node
         ]
+        if checks.contains(where: { $0["verification"] as? String == "unableToVerify" }) { result["verification"] = "unableToVerify" }
+        return result
     }
 
     private func actualValue(from attribute: [String: Any]?, fallback result: [String: Any]) -> Any {

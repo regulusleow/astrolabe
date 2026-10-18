@@ -116,13 +116,17 @@ package final class AstrolabeIOSRuntimeProvider:
     }
 
     package func fetchHierarchy(appId: String) throws -> [String: Any] {
+        try fetchHierarchy(appId: appId, semanticCapture: nil)
+    }
+
+    package func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
         let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.hierarchy(
             appID: appID.rawValue,
             handshake: session.handshake,
             appInfo: session.appInfo,
-            snapshot: try session.hierarchySnapshot()
+            snapshot: try session.hierarchySnapshot(semanticCapture: semanticCapture)
         )
     }
 
@@ -135,6 +139,19 @@ package final class AstrolabeIOSRuntimeProvider:
             requestedNodeID: nodeID,
             detail: try session.nodeDetail(nodeID: nodeID)
         )
+    }
+
+    package func preflightNativeNode(appId: String, oid: String) throws {
+        let appID = try AstrolabeRuntimeAppID(rawValue: appId)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
+        try session.preflightNativeNode(nodeID: RuntimeOpaqueIdentifier(rawValue: oid))
+    }
+
+    package func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+        let appID = try AstrolabeRuntimeAppID(rawValue: appId)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
+        let nodeID = try RuntimeOpaqueIdentifier(rawValue: oid)
+        return mapper.nodeDetail(appID: appID.rawValue, requestedNodeID: nodeID, detail: try session.nodeDetail(nodeID: nodeID, snapshotID: RuntimeOpaqueIdentifier(rawValue: runtimeSnapshotID)))
     }
 
     package func applyAttributePatch(

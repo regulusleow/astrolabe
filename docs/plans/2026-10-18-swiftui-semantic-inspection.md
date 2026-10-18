@@ -67,7 +67,7 @@
 
 **Interfaces:** hierarchy 请求可表达 includeSemantics 与 windowID；`--include-semantics`/`--window-id` 和既有工具 `includeSemantics`/`windowId`。语义 items 保存在 semanticItems，不伪造渲染字段；旧 displayItems 不变。Host 保存 runtimeSnapshotId/runtimeCapturedAtUnixTime，再分配 page snapshot ID。语义 inspect-node 消费已保存的 page snapshot，上送 Runtime snapshotID 并验证返回 semanticContext。
 
-- [ ] 先写测试：capability 缺失拒绝、不忽略 window；缺 page snapshot 不抓当前 UI；runtime/page ID 不混；A→B后请求A不取B；过期不回退；partial/歧义样式不通过；原 iOS/Android output 不变。
+- [ ] 先写测试：capability 缺失拒绝、不忽略 window；缺 page snapshot 不抓当前 UI；runtime/page ID 不混；A→B后请求A不取B；过期不回退；partial/歧义样式不通过；原 iOS/Android output 不变。特别覆盖 HierarchyNodeExtractor.nodeSnapshot/visibility 的现有 false/1/空 bounds 默认，不可应用于 kind=semantic；未知可见性不能匹配确定 true 或 false 的断言，默认查找仍能返回可检查语义候选。
 - [ ] 运行精确测试观察 RED；实现最小参数传递、mapper、上下文验证和缓存读取，补 graph semantic kind/tree.semanticChild。
 - [ ] 保存 error 的 typed 选择诊断、detail.extensions/semanticContext；字典映射不能把 nil 可见性改 true 或伪造 UILabel。
 - [ ] 跑完整 `swift test` 和 mcp-adapter 现有测试/类型检查；每组实际命令与结果入报告。

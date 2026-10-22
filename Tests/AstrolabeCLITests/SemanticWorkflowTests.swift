@@ -42,6 +42,43 @@ final class SemanticWorkflowTests: XCTestCase {
         XCTAssertEqual(NodeSemanticRoleClassifier().roles(for: native), [.button, .avatar, .image, .timer, .text])
     }
 
+    func testControlAndContainerRolesRemainSearchableWithoutRenderDefaults() throws {
+        for role in [NodeSemanticRole.input, .control, .image, .scroll, .list, .window] {
+            var item = node
+            item["runtimeRole"] = role.rawValue
+            item["customDisplayTitle"] = "01:30 avatar"
+            let query = HierarchyNodeQuery(oid: nil, className: nil, text: nil, semanticRole: role, visibleOnly: false, limit: nil)
+            let found = try XCTUnwrap(HierarchyNodeFinder().firstNodeSnapshot(in: ["semanticItems": [item]], query: query))
+            XCTAssertEqual(found["semanticRoles"] as? [String], [role.rawValue])
+            XCTAssertNil(found["visible"])
+            XCTAssertNil(found["bounds"])
+        }
+    }
+
+    func testFrozenAXValueAndTraitsAreCheckableWithoutBecomingTextStyles() {
+        let detail: [String: Any] = [
+            "semanticContext": ["availability": "partial", "textCandidates": []],
+            "attributeGroups": [["identifier": "ios.accessibility", "sections": [[
+                "identifier": "properties", "attributes": [
+                    ["identifier": "label", "semanticPath": "ios.accessibility.label", "attrTypeName": "string", "value": "运行时状态切换"],
+                    ["identifier": "value", "semanticPath": "ios.accessibility.value", "attrTypeName": "string", "value": "1"],
+                    ["identifier": "traits", "semanticPath": "ios.accessibility.traits", "attrTypeName": "stringList", "value": ["notEnabled"]]
+                ]
+            ]]]]
+        ]
+        let summary = NodeDetailSummaryBuilder().buildSummary(from: detail, appId: "app")
+        let checker = NodeDetailExpectationChecker()
+        for (attribute, value) in [("ios.accessibility.value", "1"), ("ios.accessibility.traits", "notEnabled")] {
+            let result = checker.check(summary: summary, expectation: NodeDetailExpectation(attribute: attribute, expectedValue: value, contains: true, tolerance: nil))
+            XCTAssertEqual(result["passed"] as? Bool, true)
+        }
+        for attribute in ["fontSize", "text"] {
+            let result = checker.check(summary: summary, expectation: NodeDetailExpectation(attribute: attribute, expectedValue: "28", contains: false, tolerance: nil))
+            XCTAssertEqual(result["passed"] as? Bool, false)
+            XCTAssertEqual(result["verification"] as? String, "unableToVerify")
+        }
+    }
+
     func testSemanticNodesRemainInspectableWithoutInventingRenderFacts() throws {
         let extractor = HierarchyNodeExtractor()
         let records = extractor.collectNodeRecords(in: ["displayItems": [], "semanticItems": [node]])

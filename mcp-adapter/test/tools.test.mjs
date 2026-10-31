@@ -299,6 +299,25 @@ test("registerInspectorTools forwards every supplied UI graph bound in stable or
   ]);
 });
 
+test("snapshot schemas preserve native UUID shapes", () => {
+  const server = new FakeServer();
+  registerInspectorTools(server, "/tmp/astrolabe", async () => successResult({}));
+
+  for (const name of ["capture_hierarchy", "query_ui_graph"]) {
+    const schema = server.configs.get(name).inputSchema.snapshotId;
+    for (const identifier of [
+      "11111111-1111-1111-1111-111111111111",
+      "AAAAAAAA-AAAA-AAAA-AAAA-AAAAAAAAAAAA",
+      "4d7df5e2-cb22-4261-80cc-3d85c2a41bf6"
+    ]) {
+      assert.equal(schema.parse(identifier), identifier);
+    }
+    for (const invalid of ["latest", "11111111111111111111111111111111", "GGGGGGGG-AAAA-AAAA-AAAA-AAAAAAAAAAAA"]) {
+      assert.throws(() => schema.parse(invalid));
+    }
+  }
+});
+
 test("query_ui_graph schema enforces frozen snapshot and native public bounds", () => {
   const server = new FakeServer();
   registerInspectorTools(server, "/tmp/astrolabe", async () => successResult({}));

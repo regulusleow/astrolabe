@@ -26,7 +26,8 @@ const semanticRoleValues = [
 
 type NodeSemanticRole = typeof semanticRoleValues[number];
 
-const snapshotIdSchema = z.string().uuid().optional().describe(
+// Match native UUID shape validation without imposing RFC version or variant bits.
+const snapshotIdSchema = z.guid().optional().describe(
   "snapshotId returned by a hierarchy tool; when provided, use that page snapshot without recapturing the current hierarchy"
 );
 const semanticCaptureSchema = {
@@ -273,7 +274,7 @@ export function registerInspectorTools(
       outputSchema: inspectorToolOutputSchema,
       inputSchema: {
         appId: z.string().min(1).describe("appId returned by list_apps"),
-        snapshotId: z.string().uuid().describe("Frozen snapshotId returned by a hierarchy tool"),
+        snapshotId: snapshotIdSchema.unwrap().describe("Frozen snapshotId returned by a hierarchy tool"),
         rootOid: z.string().min(1).describe("Opaque root node ID from the same frozen snapshot"),
         relationTypes: z.array(z.string().min(1)).min(1).describe("Open namespaced relation identifiers to traverse"),
         direction: z.enum(["outgoing", "incoming", "both"]).optional().describe("Optional traversal direction; omitted values use the native CLI default"),

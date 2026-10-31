@@ -5,7 +5,6 @@ const hostMetadataPath = "Sources/AstrolabeCLI/CommandLine/AstrolabeHostMetadata
 
 export const versionedPaths = Object.freeze([
   hostMetadataPath,
-  "docs/protocol-architecture.md",
   "mcp-adapter/package-lock.json",
   "mcp-adapter/package.json",
   "package-lock.json",
@@ -14,7 +13,6 @@ export const versionedPaths = Object.freeze([
 
 const strictReleaseVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 const swiftVersionPattern = /static let version = "(\d+\.\d+\.\d+)"/g;
-const documentationVersionPattern = /`astrolabe (\d+\.\d+\.\d+)`/g;
 
 export function assertReleaseVersion(version) {
   if (!strictReleaseVersionPattern.test(version)) {
@@ -57,11 +55,6 @@ export function synchronizeRepositoryVersion(projectRoot, version) {
       join(projectRoot, hostMetadataPath),
       swiftVersionPattern,
       `static let version = "${version}"`
-    ),
-    textVersionUpdate(
-      join(projectRoot, "docs/protocol-architecture.md"),
-      documentationVersionPattern,
-      `\`astrolabe ${version}\``
     )
   ];
 
@@ -100,13 +93,6 @@ export function versionConsistencyIssues(projectRoot) {
     join(projectRoot, hostMetadataPath),
     hostMetadataPath,
     swiftVersionPattern,
-    expectedVersion,
-    issues
-  );
-  inspectTextVersion(
-    join(projectRoot, "docs/protocol-architecture.md"),
-    "docs/protocol-architecture.md",
-    documentationVersionPattern,
     expectedVersion,
     issues
   );

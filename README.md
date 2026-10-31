@@ -165,8 +165,7 @@ Inspect `semanticCapture` and `semanticContext` availability/issues rather than
 assuming complete visual recovery. Candidate Text fields remain in
 `semanticContext.textCandidates`; they never satisfy style assertions. Missing or
 ambiguous semantic style returns `verification=unableToVerify`, while an independently
-proven canonical field can be checked even when other fields are partial. See the
-[approved semantic contract](docs/architecture/2026-10-18-swiftui-semantic-inspection.md).
+proven canonical field can be checked even when other fields are partial.
 
 The installed MCP server exposes the same capabilities to Codex, OpenCode, and
 Claude Code. The bundled skill guides app discovery, snapshot reuse, node

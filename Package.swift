@@ -13,7 +13,7 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/regulusleow/astrolabe-protocol.git",
-            revision: "8893e2da3247e0d7e8dfb060156f5d42fb9f75d1"
+            revision: "246c821027c52559e43562a61077b22cb9c16e96"
         )
     ],
     targets: [

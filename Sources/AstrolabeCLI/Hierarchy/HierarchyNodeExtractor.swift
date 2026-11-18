@@ -22,10 +22,10 @@ struct HierarchyNodeRecord {
 }
 
 struct HierarchyNodeVisibility {
-    /// Whether render hidden/alpha states permit display; nil for semantic observations.
+    /// Whether render hidden/alpha states permit display; nil when no render proof was captured.
     let hierarchyVisible: Bool?
 
-    /// Runtime render visibility; semantic AX geometry does not prove this fact.
+    /// Runtime basic visibility; semantic AX geometry alone does not prove this fact.
     let onscreen: Bool?
 }
 
@@ -99,7 +99,10 @@ struct HierarchyNodeExtractor {
     }
 
     func visibility(from node: [String: Any]) -> HierarchyNodeVisibility {
-        if node["kind"] as? String == "semantic" { return HierarchyNodeVisibility(hierarchyVisible: nil, onscreen: nil) }
+        if node["kind"] as? String == "semantic" {
+            return HierarchyNodeVisibility(hierarchyVisible: node["hierarchyVisible"] as? Bool,
+                                           onscreen: node["onscreen"] as? Bool)
+        }
         let hidden = node["hidden"] as? Bool ?? false
         let hiddenByAncestor = node["inHiddenHierarchy"] as? Bool ?? false
         let effectiveAlpha = numericValue(from: node["effectiveAlpha"])

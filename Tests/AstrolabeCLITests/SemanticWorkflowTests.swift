@@ -105,6 +105,23 @@ final class SemanticWorkflowTests: XCTestCase {
         XCTAssertThrowsError(try PageSnapshotArgumentParser().parse(arguments: ["--snapshot-id", UUID().uuidString, "--include-semantics", "--window-id", "window-1"]))
     }
 
+    func testSemanticVisibleOnlyUsesProvenFactsAndKeepsUnknownOut() throws {
+        let query = HierarchyNodeQuery(oid: nil, className: nil, text: nil, semanticRole: nil, visibleOnly: true, limit: nil)
+        for visible in [true, false] {
+            var known = node
+            known["visible"] = visible
+            known["onscreen"] = visible
+            known["hierarchyVisible"] = true
+            let found = HierarchyNodeFinder().firstNodeSnapshot(in: ["semanticItems": [known]], query: query)
+            XCTAssertEqual(found != nil, visible)
+            let checked = NodeExpectationChecker().check(node: known,
+                expectation: NodeExpectation(className: nil, text: nil, visible: visible, frame: nil, tolerance: 0))
+            XCTAssertEqual(checked["passed"] as? Bool, true)
+            XCTAssertEqual(HierarchyNodeExtractor().visibility(from: known).hierarchyVisible, true)
+        }
+        XCTAssertNil(HierarchyNodeFinder().firstNodeSnapshot(in: ["semanticItems": [node]], query: query))
+    }
+
     func testFrozenDetailUsesOriginalRuntimeIdentityAndTimeAcrossNewCaptureAndOfflineCache() throws {
         let service = SemanticService()
         let store = SemanticStore()

@@ -183,6 +183,30 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         )
     }
 
+    func testMapperPreservesProvenSemanticVisibility() throws {
+        let base = try makeHierarchy()
+        for opacity in [1.0, 0.005] {
+            let visibility = try RuntimeNodeVisibility(hidden: false, hiddenByAncestor: false, opacity: 1,
+                effectiveOpacity: opacity, intersectsViewport: true, fullyClippedByAncestor: false, onscreen: opacity > 0.01)
+            let node = try RuntimeSemanticNode(nodeID: RuntimeOpaqueIdentifier(rawValue: "semantic-visible"),
+                parentID: nil, siblingIndex: 0, role: "text", runtimeType: RuntimeType(name: "SwiftUI.AccessibilityNode", ancestors: []),
+                visibility: visibility, availableDetailCategories: [], children: [])
+            let capture = try RuntimeSemanticCapture(windowID: RuntimeOpaqueIdentifier(rawValue: "window-2"),
+                source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .complete,
+                issues: [], visitedNodeCount: 1, wasTruncated: false, roots: [node])
+            let snapshot = RuntimeHierarchySnapshotPayload(snapshotID: base.snapshotID, capturedAtUnixTime: base.capturedAtUnixTime,
+                targetIdentifier: base.targetIdentifier, orientation: base.orientation, display: base.display,
+                viewport: base.viewport, roots: base.roots, semanticCapture: capture)
+            let mapped = AstrolabeRuntimeResponseMapper().hierarchy(appID: "app", handshake: try makeHandshake(), appInfo: try makeAppInfo(), snapshot: snapshot)
+            let actual = try XCTUnwrap((mapped["semanticItems"] as? [[String: Any]])?.first)
+            XCTAssertEqual(actual["kind"] as? String, "semantic")
+            XCTAssertEqual(actual["visible"] as? Bool, opacity > 0.01)
+            XCTAssertEqual(actual["onscreen"] as? Bool, opacity > 0.01)
+            XCTAssertEqual(actual["hierarchyVisible"] as? Bool, opacity > 0.01)
+            XCTAssertEqual(actual["effectiveAlpha"] as? Double, opacity)
+        }
+    }
+
     func testRuntimeAppIDRoundTripsOpaqueInstanceIdentifier() throws {
         let appID = AstrolabeRuntimeAppID(
             endpoint: makeEndpoint(),

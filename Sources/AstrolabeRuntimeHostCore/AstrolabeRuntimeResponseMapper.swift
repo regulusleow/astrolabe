@@ -88,6 +88,17 @@ package struct AstrolabeRuntimeResponseMapper {
         result["frameInScreen"] = node.frameInScreen.map(encodedObject)
         result["accessibility"] = node.accessibility.map(accessibilityDictionary)
         result["customDisplayTitle"] = node.accessibility?.label
+        if let visibility = node.visibility {
+            result["visible"] = visibility.onscreen
+            result["onscreen"] = visibility.onscreen
+            result["hierarchyVisible"] = !visibility.hidden && !visibility.hiddenByAncestor && visibility.effectiveOpacity > 0.01
+            result["hidden"] = visibility.hidden
+            result["inHiddenHierarchy"] = visibility.hiddenByAncestor
+            result["alpha"] = visibility.opacity
+            result["effectiveAlpha"] = visibility.effectiveOpacity
+            result["intersectsViewport"] = visibility.intersectsViewport
+            result["fullyClippedByAncestor"] = visibility.fullyClippedByAncestor
+        }
         return result
     }
 

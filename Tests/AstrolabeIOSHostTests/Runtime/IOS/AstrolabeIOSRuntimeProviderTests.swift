@@ -14,6 +14,37 @@ import Foundation
 import XCTest
 
 final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
+    func testDiscoveryTimeoutDoesNotBlockOtherAppsOrReuseProbeForInspection() throws {
+        let silent = FakeAstrolabeRuntimeClient()
+        silent.handshakeError = .timeout("Receive an Astrolabe Runtime response")
+        let discovered = FakeAstrolabeRuntimeClient()
+        discovered.handshakeValue = try makeHandshake()
+        discovered.appInfoValue = try makeAppInfo()
+        let session = FakeAstrolabeRuntimeClient()
+        session.handshakeValue = try makeHandshake()
+        session.appInfoValue = try makeAppInfo()
+        session.hierarchyValue = try makeHierarchy()
+        let probes = FakeAstrolabeRuntimeClientFactory(clients: [silent, discovered])
+        let sessions = FakeAstrolabeRuntimeClientFactory(clients: [session])
+        let endpoint = makeEndpoint()
+        let unavailable = AstrolabeRuntimeEndpoint(connectionKind: endpoint.connectionKind,
+            deviceId: endpoint.deviceId, host: endpoint.host, port: endpoint.port + 1)
+        let provider = AstrolabeIOSRuntimeProvider(
+            endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: [unavailable, endpoint]),
+            clientFactory: sessions, discoveryClientFactory: probes)
+
+        let apps = try provider.fetchApps()
+        XCTAssertEqual(apps.count, 1)
+        XCTAssertEqual(probes.createdEndpoints, [unavailable, endpoint])
+        XCTAssertTrue(sessions.createdEndpoints.isEmpty)
+        XCTAssertTrue(silent.calls.contains("close"))
+        XCTAssertTrue(discovered.calls.contains("close"))
+        _ = try provider.fetchHierarchy(appId: XCTUnwrap(apps.first).appId)
+        XCTAssertEqual(sessions.createdEndpoints, [endpoint])
+        XCTAssertTrue(session.calls.contains("hierarchy"))
+        XCTAssertFalse(discovered.calls.contains("hierarchy"))
+    }
+
     func testCapableRuntimeBareOpaqueDetailRefusalNeverTriggersHierarchy() throws {
         for code in [RuntimeErrorCode.invalidParameters, .nodeNotFound] {
             let client = FakeAstrolabeRuntimeClient()

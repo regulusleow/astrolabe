@@ -23,12 +23,17 @@ package protocol AstrolabeRuntimeTransportCreating {
 
 package struct TCPAstrolabeRuntimeTransportFactory:
     AstrolabeRuntimeTransportCreating {
-    package init() {}
+    /// Per-I/O deadline; discovery uses a shorter budget than inspection sessions.
+    private let requestTimeout: TimeInterval
+
+    package init(requestTimeout: TimeInterval = 30) {
+        self.requestTimeout = requestTimeout
+    }
 
     package func makeTransport(
         endpoint: AstrolabeRuntimeEndpoint
     ) throws -> any AstrolabeRuntimeTransport {
-        try TCPAstrolabeRuntimeTransport(endpoint: endpoint)
+        try TCPAstrolabeRuntimeTransport(endpoint: endpoint, requestTimeout: requestTimeout)
     }
 }
 

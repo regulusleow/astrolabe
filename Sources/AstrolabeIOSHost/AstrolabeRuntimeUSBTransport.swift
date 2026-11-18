@@ -97,8 +97,15 @@ struct USBMuxAstrolabeRuntimeEndpointDiscovery:
 
 struct DefaultAstrolabeRuntimeTransportFactory:
     AstrolabeRuntimeTransportCreating {
-    private let tcpFactory = TCPAstrolabeRuntimeTransportFactory()
-    private let usbFactory = USBMuxAstrolabeRuntimeTransportFactory()
+    /// TCP transport configured for this factory's operation budget.
+    private let tcpFactory: TCPAstrolabeRuntimeTransportFactory
+    /// USB transport configured for the same operation budget.
+    private let usbFactory: USBMuxAstrolabeRuntimeTransportFactory
+
+    init(requestTimeout: TimeInterval = 30) {
+        tcpFactory = TCPAstrolabeRuntimeTransportFactory(requestTimeout: requestTimeout)
+        usbFactory = USBMuxAstrolabeRuntimeTransportFactory(requestTimeout: requestTimeout)
+    }
 
     func makeTransport(
         endpoint: AstrolabeRuntimeEndpoint
@@ -118,6 +125,9 @@ struct DefaultAstrolabeRuntimeTransportFactory:
 
 struct USBMuxAstrolabeRuntimeTransportFactory:
     AstrolabeRuntimeTransportCreating {
+    /// Per-I/O deadline for the connections created by this factory.
+    let requestTimeout: TimeInterval
+
     func makeTransport(
         endpoint: AstrolabeRuntimeEndpoint
     ) throws -> any AstrolabeRuntimeTransport {
@@ -134,7 +144,7 @@ struct USBMuxAstrolabeRuntimeTransportFactory:
                 "Invalid USB Runtime endpoint"
             )
         }
-        return USBMuxAstrolabeRuntimeTransport(connection: connection)
+        return USBMuxAstrolabeRuntimeTransport(connection: connection, requestTimeout: requestTimeout)
     }
 }
 

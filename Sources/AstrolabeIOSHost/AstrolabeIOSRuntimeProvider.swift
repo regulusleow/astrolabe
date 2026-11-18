@@ -31,7 +31,8 @@ package final class AstrolabeIOSRuntimeProvider:
     )
 
     private let endpointDiscovery: any AstrolabeRuntimeEndpointDiscovering
-    private let clientFactory: any AstrolabeRuntimeClientCreating
+    /// Short-lived discovery probes must not inherit the inspection request timeout.
+    private let discoveryClientFactory: any AstrolabeRuntimeClientCreating
     private let mapper: AstrolabeRuntimeResponseMapper
     private let compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
     private let sessionStore: AstrolabeRuntimeSessionStore
@@ -44,11 +45,8 @@ package final class AstrolabeIOSRuntimeProvider:
                 SimulatorAstrolabeRuntimeEndpointDiscovery(),
                 USBMuxAstrolabeRuntimeEndpointDiscovery()
             ]),
-        clientFactory: any AstrolabeRuntimeClientCreating =
-            AstrolabeRuntimeProtocolClientFactory(
-                transportFactory: DefaultAstrolabeRuntimeTransportFactory(),
-                runtimePackageName: "astrolabe-runtime-ios"
-            ),
+        clientFactory: (any AstrolabeRuntimeClientCreating)? = nil,
+        discoveryClientFactory: (any AstrolabeRuntimeClientCreating)? = nil,
         mapper: AstrolabeRuntimeResponseMapper = AstrolabeRuntimeResponseMapper(),
         compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy =
             AstrolabeRuntimeCompatibilityPolicy(
@@ -57,11 +55,17 @@ package final class AstrolabeIOSRuntimeProvider:
             )
     ) {
         self.endpointDiscovery = endpointDiscovery
-        self.clientFactory = clientFactory
+        self.discoveryClientFactory = discoveryClientFactory ?? clientFactory ?? AstrolabeRuntimeProtocolClientFactory(
+            transportFactory: DefaultAstrolabeRuntimeTransportFactory(requestTimeout: 1),
+            runtimePackageName: "astrolabe-runtime-ios"
+        )
         self.mapper = mapper
         self.compatibilityPolicy = compatibilityPolicy
         sessionStore = AstrolabeRuntimeSessionStore(
-            clientFactory: clientFactory,
+            clientFactory: clientFactory ?? AstrolabeRuntimeProtocolClientFactory(
+                transportFactory: DefaultAstrolabeRuntimeTransportFactory(),
+                runtimePackageName: "astrolabe-runtime-ios"
+            ),
             compatibilityPolicy: compatibilityPolicy
         )
     }
@@ -216,7 +220,7 @@ package final class AstrolabeIOSRuntimeProvider:
         endpoint: AstrolabeRuntimeEndpoint
     ) -> AstrolabeRuntimeDiscoveryResult {
         do {
-            let client = try clientFactory.makeClient(endpoint: endpoint)
+            let client = try discoveryClientFactory.makeClient(endpoint: endpoint)
             defer { client.close() }
             let handshake = try client.handshake()
             let compatibility = compatibilityPolicy.evaluate(handshake: handshake)

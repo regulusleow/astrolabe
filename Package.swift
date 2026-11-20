@@ -208,6 +208,10 @@ let package = Package(
             path: "Tests/AstrolabeAndroidPlatformTests"
         ),
         .testTarget(
+            name: "AstrolabeMacOSHostTests",
+            dependencies: ["AstrolabeCLI", "AstrolabeMacOSHost", "AstrolabeRuntimeHostCore"]
+        ),
+        .testTarget(
             name: "AstrolabeIOSHostTests",
             dependencies: [
                 "AstrolabeCLI",

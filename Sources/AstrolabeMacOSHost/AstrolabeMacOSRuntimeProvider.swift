@@ -26,17 +26,18 @@ final class AstrolabeMacOSRuntimeProvider:
         capabilities: [.appDiscovery, .hierarchy, .nodeDetail]
     )
 
-    private let discoveryClient = AstrolabeRuntimeProtocolClientFactory(
-        transportFactory: TCPAstrolabeRuntimeTransportFactory(requestTimeout: 1),
-        runtimePackageName: packageName
-    )
+    private let discoveryClient: any AstrolabeRuntimeClientCreating
     private let mapper = AstrolabeRuntimeResponseMapper()
     private let compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
     private let sessionStore: AstrolabeRuntimeSessionStore
     private let diagnosticLock = NSLock()
     private var diagnostics = [RuntimeAppDiscoveryDiagnostic]()
 
-    init() {
+    init(discoveryClient: any AstrolabeRuntimeClientCreating = AstrolabeRuntimeProtocolClientFactory(
+        transportFactory: TCPAstrolabeRuntimeTransportFactory(requestTimeout: 1),
+        runtimePackageName: AstrolabeMacOSRuntimeProvider.packageName
+    )) {
+        self.discoveryClient = discoveryClient
         let policy = AstrolabeRuntimeCompatibilityPolicy(descriptor: descriptor, runtimePackageName: Self.packageName)
         compatibilityPolicy = policy
         sessionStore = AstrolabeRuntimeSessionStore(
@@ -62,7 +63,7 @@ final class AstrolabeMacOSRuntimeProvider:
     func fetchApps() throws -> [InspectableAppRecord] {
         var discoveredDiagnostics = [RuntimeAppDiscoveryDiagnostic]()
         var targets = Set<AstrolabeRuntimeSessionTarget>()
-        let apps = try Self.ports.compactMap { port -> InspectableAppRecord? in
+        let apps = Self.ports.compactMap { port -> InspectableAppRecord? in
             let endpoint = endpoint(port: port)
             do {
                 let client = try discoveryClient.makeClient(endpoint: endpoint)
@@ -87,8 +88,10 @@ final class AstrolabeMacOSRuntimeProvider:
                     deviceId: endpoint.deviceId, endpointPort: Int(port),
                     processIdentifier: appInfo?.target.processIdentifier ?? "", compatibility: compatibility.record
                 )
-            } catch let error as AstrolabeRuntimeClientError {
-                switch error {
+            } catch {
+                let failure = error as? AstrolabeRuntimeClientError
+                    ?? .invalidResponse("无法解析本机 Runtime 发现响应：\(error.localizedDescription)")
+                switch failure {
                 case .connectionFailed, .connectionClosed:
                     return nil
                 case let .timeout(operation) where operation == "Connect to Astrolabe Runtime":
@@ -97,7 +100,7 @@ final class AstrolabeMacOSRuntimeProvider:
                     discoveredDiagnostics.append(RuntimeAppDiscoveryDiagnostic(
                         providerIdentifier: descriptor.identifier, platform: descriptor.platform,
                         connectionKind: endpoint.connectionKind, deviceId: endpoint.deviceId, endpointPort: Int(port),
-                        errorCode: error.code, message: error.description, recoverySuggestion: error.recoverySuggestion
+                        errorCode: failure.code, message: failure.description, recoverySuggestion: failure.recoverySuggestion
                     ))
                     return nil
                 }

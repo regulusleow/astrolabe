@@ -106,19 +106,17 @@ struct NodeDetailSummaryBuilder {
         if let colorRGBA = valueFormatter.colorRGBA(from: value, attrTypeName: attrTypeName) {
             result["colorRGBA"] = colorRGBA
         }
-        if let semanticPath = attribute["semanticPath"] as? String,
-           !semanticPath.isEmpty {
-            result["semanticPath"] = semanticPath
+        let wirePath = attribute["semanticPath"] as? String
+        if let wirePath, !wirePath.isEmpty {
+            result["semanticPath"] = wirePath
         }
-        if isSemanticDetail,
-           let semanticPath = attribute["semanticPath"] as? String,
-           semanticPath.hasPrefix("common.text.") {
-            let field = String(semanticPath.dropFirst("common.text.".count))
+        if isSemanticDetail, let wirePath, wirePath.hasPrefix("common.text.") {
+            let field = String(wirePath.dropFirst("common.text.".count))
             result["semanticName"] = field == "color" ? "textColor" : field == "content" ? "text" : field
         } else if let semantics = semanticMapper.semantics(
             forIdentifier: identifier,
             appId: appId
-        ) {
+        ) ?? wirePath.flatMap({ semanticMapper.semantics(forIdentifier: $0, appId: appId) }) {
             result["semanticName"] = semantics.name
             if isSemanticDetail, let wirePath = result["semanticPath"] as? String, wirePath != semantics.path {
                 result["semanticPathAlias"] = semantics.path

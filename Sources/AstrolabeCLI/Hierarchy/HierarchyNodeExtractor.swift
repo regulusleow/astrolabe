@@ -19,6 +19,9 @@ struct HierarchyNodeRecord {
 
     /// Index of the current node among its siblings.
     let siblingIndex: Int
+
+    /// Native window that owns this render or semantic node, when known.
+    let windowID: String?
 }
 
 struct HierarchyNodeVisibility {
@@ -38,8 +41,10 @@ struct HierarchyNodeExtractor {
     }
 
     func collectNodeRecords(in hierarchy: [String: Any]) -> [HierarchyNodeRecord] {
-        collectNodeRecords(from: hierarchy["displayItems"], parentPath: "", depth: 0)
-            + collectNodeRecords(from: hierarchy["semanticItems"], parentPath: "semantic", depth: 0)
+        let capture = hierarchy["semanticCapture"] as? [String: Any]
+        return collectNodeRecords(from: hierarchy["displayItems"], parentPath: "", depth: 0, windowID: nil)
+            + collectNodeRecords(from: hierarchy["semanticItems"], parentPath: "semantic", depth: 0,
+                                 windowID: capture?["windowID"] as? String)
     }
 
     func isVisibleNode(_ node: [String: Any]) -> Bool {
@@ -203,7 +208,12 @@ struct HierarchyNodeExtractor {
         return result
     }
 
-    private func collectNodeRecords(from value: Any?, parentPath: String, depth: Int) -> [HierarchyNodeRecord] {
+    private func collectNodeRecords(
+        from value: Any?,
+        parentPath: String,
+        depth: Int,
+        windowID: String?
+    ) -> [HierarchyNodeRecord] {
         guard let array = value as? [Any] else {
             return []
         }
@@ -216,17 +226,22 @@ struct HierarchyNodeExtractor {
             }
             let pathComponent = "\(dictionary["className"] as? String ?? "Unknown")[\(index)]"
             let hierarchyPath = parentPath.isEmpty ? pathComponent : "\(parentPath)/\(pathComponent)"
+            let isWindowRoot = parentPath.isEmpty && (dictionary["runtimeRole"] as? String == "window"
+                || semanticRoles(from: dictionary).contains(.window))
+            let owner = isWindowRoot ? nodeIdentifier(from: dictionary["oid"]) : windowID
             let record = HierarchyNodeRecord(
                 node: dictionary,
                 hierarchyPath: hierarchyPath,
                 depth: depth,
-                siblingIndex: index
+                siblingIndex: index,
+                windowID: owner
             )
             result.append(record)
             result.append(contentsOf: collectNodeRecords(
                 from: dictionary["subitems"],
                 parentPath: hierarchyPath,
-                depth: depth + 1
+                depth: depth + 1,
+                windowID: owner
             ))
         }
         return result

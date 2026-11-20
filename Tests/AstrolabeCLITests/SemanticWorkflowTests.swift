@@ -13,7 +13,7 @@ final class SemanticWorkflowTests: XCTestCase {
         let extractor = HierarchyNodeExtractor()
         XCTAssertEqual(extractor.semanticRoles(from: button), [.button])
         XCTAssertEqual(extractor.nodeSnapshot(from: button)["semanticRoles"] as? [String], ["button"])
-        let record = HierarchyNodeRecord(node: button, hierarchyPath: "semantic[0]", depth: 0, siblingIndex: 0)
+        let record = HierarchyNodeRecord(node: button, hierarchyPath: "semantic[0]", depth: 0, siblingIndex: 0, windowID: nil)
         XCTAssertEqual(HierarchyNodeSearchProjectionBuilder().buildProjection(from: record)["semanticRoles"] as? [String], ["button"])
         for role in [NodeSemanticRole.text, .timer] {
             let query = HierarchyNodeQuery(oid: nil, className: nil, text: nil, semanticRole: role, visibleOnly: false, limit: nil)
@@ -91,7 +91,7 @@ final class SemanticWorkflowTests: XCTestCase {
         for key in ["bounds", "hidden", "alpha", "visible", "onscreen", "hierarchyVisible", "frame"] {
             XCTAssertNil(snapshot[key], key)
         }
-        let projection = HierarchyNodeSearchProjectionBuilder().buildProjection(from: HierarchyNodeRecord(node: node, hierarchyPath: "semantic[0]", depth: 0, siblingIndex: 0))
+        let projection = HierarchyNodeSearchProjectionBuilder().buildProjection(from: HierarchyNodeRecord(node: node, hierarchyPath: "semantic[0]", depth: 0, siblingIndex: 0, windowID: nil))
         XCTAssertNil(projection["visible"])
         for visible in [true, false] {
             let checked = NodeExpectationChecker().check(node: snapshot, expectation: NodeExpectation(className: nil, text: nil, visible: visible, frame: nil, tolerance: 0))

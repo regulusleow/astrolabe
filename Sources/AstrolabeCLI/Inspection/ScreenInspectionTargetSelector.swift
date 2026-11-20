@@ -24,10 +24,7 @@ struct ScreenInspectionTargetSelector {
         let screenFrame = records
             .first { extractor.semanticRoles(from: $0.node).contains(.window) }
             .flatMap { frame(from: $0.node) }
-        let candidates = records.compactMap { record in
-            targetSnapshot(from: record, screenFrame: screenFrame)
-        }
-        let deduplicated = deduplicateNestedContent(candidates)
+        let deduplicated = deduplicatedTargets(from: records, screenFrame: screenFrame)
         let grouped = Dictionary(grouping: deduplicated) { target in
             targetReason(from: target)
         }.mapValues { targets in
@@ -117,18 +114,24 @@ struct ScreenInspectionTargetSelector {
         return .visibleNode
     }
 
-    private func deduplicateNestedContent(_ targets: [[String: Any]]) -> [[String: Any]] {
-        targets.reduce(into: []) { result, candidate in
+    private func deduplicatedTargets(
+        from records: [HierarchyNodeRecord],
+        screenFrame: ScreenInspectionFrame?
+    ) -> [[String: Any]] {
+        var result = [(windowID: String?, target: [String: Any])]()
+        for record in records {
+            guard let candidate = targetSnapshot(from: record, screenFrame: screenFrame) else { continue }
             guard let duplicateIndex = result.firstIndex(where: { existing in
-                representsSameVisibleContent(existing, candidate)
+                existing.windowID == record.windowID && representsSameVisibleContent(existing.target, candidate)
             }) else {
-                result.append(candidate)
-                return
+                result.append((record.windowID, candidate))
+                continue
             }
-            if semanticPriority(candidate) < semanticPriority(result[duplicateIndex]) {
-                result[duplicateIndex] = candidate
+            if semanticPriority(candidate) < semanticPriority(result[duplicateIndex].target) {
+                result[duplicateIndex].target = candidate
             }
         }
+        return result.map(\.target)
     }
 
     private func representsSameVisibleContent(

@@ -11,6 +11,7 @@ import Foundation
 package enum RuntimeUIPlatform: String, Encodable, Hashable {
     case ios
     case android
+    case macos
 }
 
 package enum RuntimeUICapability: String, Encodable, Hashable {

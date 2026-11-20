@@ -8,12 +8,14 @@
 import AstrolabeAndroidPlatform
 import AstrolabeCLI
 import AstrolabeIOSHost
+import AstrolabeMacOSHost
 import Foundation
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 let runner = try CLICommandRunner(platformModules: [
     AstrolabeIOSHostFactory.makePlatformModule(),
-    AstrolabeAndroidHostFactory.makePlatformModule()
+    AstrolabeAndroidHostFactory.makePlatformModule(),
+    AstrolabeMacOSHostFactory.makePlatformModule()
 ])
 let exitCode = runner.runAndPrint(arguments: arguments)
 runner.close()

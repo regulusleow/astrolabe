@@ -39,9 +39,11 @@ struct PlatformNeutralNodeDetailAttributeSemanticMapper:
     }
 }
 
-struct PlatformNeutralNodeDetailSemanticIssueInterpreter:
+package struct PlatformNeutralNodeDetailSemanticIssueInterpreter:
     NodeDetailSemanticIssueInterpreting {
-    func issueName(for semanticName: String, appId: String) -> String {
+    package init() {}
+
+    package func issueName(for semanticName: String, appId: String) -> String {
         "\(semanticName)Changed"
     }
 }

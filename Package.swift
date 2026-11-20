@@ -131,12 +131,21 @@ let package = Package(
             ],
             path: "Sources/AstrolabeIOSHost"
         ),
+        .target(
+            name: "AstrolabeMacOSHost",
+            dependencies: [
+                "AstrolabeCLI",
+                "AstrolabeRuntimeHostCore",
+                .product(name: "AstrolabeProtocol", package: "astrolabe-protocol")
+            ]
+        ),
         .executableTarget(
             name: "AstrolabeExecutable",
             dependencies: [
                 "AstrolabeAndroidPlatform",
                 "AstrolabeCLI",
-                "AstrolabeIOSHost"
+                "AstrolabeIOSHost",
+                "AstrolabeMacOSHost"
             ],
             path: "Sources/AstrolabeExecutable"
         ),

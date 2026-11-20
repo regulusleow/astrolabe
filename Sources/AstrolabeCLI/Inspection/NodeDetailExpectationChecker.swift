@@ -63,7 +63,8 @@ struct NodeDetailExpectationChecker {
                 attribute["identifier"],
                 attribute["displayTitle"],
                 attribute["semanticName"],
-                attribute["semanticPath"]
+                attribute["semanticPath"],
+                attribute["semanticPathAlias"]
             ]
                 .compactMap { $0 as? String }
                 .map { $0.lowercased() }

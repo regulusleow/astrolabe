@@ -17,6 +17,23 @@ import UniformTypeIdentifiers
 private typealias Fixtures = CLICommandTestFixtures
 
 final class NodeInspectionCommandTests: XCTestCase {
+    func testFrozenControlCanBeCheckedByWirePathAndPlatformAlias() throws {
+        let builder = NodeDetailSummaryBuilder(semanticMapper: UIKitNodeDetailAttributeSemanticMapper())
+        let attribute: [String: Any] = ["identifier": "enabled", "semanticPath": "ios.control.enabled",
+                                        "attrTypeName": "boolean", "value": true]
+        let detail: [String: Any] = ["semanticContext": ["availability": "complete"], "attributeGroups": [
+            ["identifier": "ios.control", "sections": [["identifier": "properties", "attributes": [attribute]]]]
+        ]]
+        for path in ["ios.control.enabled", "control.enabled"] {
+            let summary = builder.buildSummary(from: detail, appId: "app", filter: path)
+            let attributes = try XCTUnwrap(summary["attributes"] as? [[String: Any]])
+            XCTAssertEqual(attributes.first?["semanticPath"] as? String, "ios.control.enabled")
+            let result = NodeDetailExpectationChecker().check(summary: summary,
+                expectation: .init(attribute: path, expectedValue: nil, contains: false, tolerance: nil))
+            XCTAssertEqual(result["passed"] as? Bool, true, path)
+        }
+    }
+
     func testNodeDetailRequiresValidOid() {
         XCTAssertThrowsError(try Fixtures.makeRunner(service: Fixtures.FakeInspectorService()).run(arguments: ["node-detail", "app-1"])) { error in
             XCTAssertEqual(String(describing: error), "Missing argument: appId oid")

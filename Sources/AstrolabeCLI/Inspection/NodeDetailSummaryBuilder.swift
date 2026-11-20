@@ -120,7 +120,11 @@ struct NodeDetailSummaryBuilder {
             appId: appId
         ) {
             result["semanticName"] = semantics.name
-            result["semanticPath"] = semantics.path
+            if isSemanticDetail, let wirePath = result["semanticPath"] as? String, wirePath != semantics.path {
+                result["semanticPathAlias"] = semantics.path
+            } else {
+                result["semanticPath"] = semantics.path
+            }
         }
         if !groupTitle.isEmpty {
             result["groupTitle"] = groupTitle
@@ -143,6 +147,7 @@ struct NodeDetailSummaryBuilder {
             attribute["attrTypeName"],
             attribute["semanticName"],
             attribute["semanticPath"],
+            attribute["semanticPathAlias"],
             attribute["valuePreview"],
             attribute["extraValuePreview"]
         ]

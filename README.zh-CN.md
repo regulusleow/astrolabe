@@ -98,6 +98,10 @@ npm run check:claude-code
 npm run uninstall:claude-code
 ```
 
+## 原生 macOS App
+
+在 macOS 15 及以上的原生 AppKit Debug App 中[嵌入 Apple Runtime](https://github.com/regulusleow/astrolabe-runtime-ios#native-macos-debug-apps)，然后打开目标窗口。使用 `list-apps`、`capture-hierarchy`、`find-nodes`、`inspect-node` 或对应的 MCP 工具。`macos` App 记录会列出可用的检查能力。
+
 ## 快速开始
 
 启动包含受支持 Runtime SDK 的 Debug 构建，抓取 UI 时保持 App 正在前台运行。先发现 App：

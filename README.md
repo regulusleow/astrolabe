@@ -110,6 +110,10 @@ npm run check:claude-code
 npm run uninstall:claude-code
 ```
 
+## Native macOS apps
+
+For a native AppKit Debug app on macOS 15 or later, [embed the Apple runtime](https://github.com/regulusleow/astrolabe-runtime-ios#native-macos-debug-apps) and open the target window. Use `list-apps`, `capture-hierarchy`, `find-nodes`, and `inspect-node` or their MCP equivalents. The `macos` app record advertises the supported inspection operations.
+
 ## Quick Start
 
 Launch a Debug build that includes a supported Runtime SDK and keep it in the

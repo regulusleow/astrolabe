@@ -1,11 +1,11 @@
 ---
 name: astrolabe
-description: Use when inspecting a running mobile app UI or reviewing whether an implementation matches supplied design references.
+description: Use when inspecting a running app UI or reviewing whether an implementation matches supplied design references.
 ---
 
 # Astrolabe
 
-Use Astrolabe MCP to read the UI hierarchy, node properties, and screenshots of a mobile app that is currently running. UI review is read-only by default, and every conclusion must be based on current runtime evidence.
+Use Astrolabe MCP to read the UI hierarchy and node properties of a running app. Read screenshots on platforms that provide screenshot capture. UI review is read-only by default, and every conclusion must be based on current runtime evidence.
 
 ## 1. Acceptance prerequisites
 
@@ -31,7 +31,7 @@ Call the tools in this order:
 2. `inspect_screen`: confirm that the current UI and state match the acceptance target, then obtain a new `snapshotId`.
 3. `find_nodes`: find candidate nodes by text, semantic role, or class name.
 4. `inspect_node` or `summarize_node_detail`: read a node's frame, text, style, and other properties.
-5. `capture_screenshot`: capture the current rendered result.
+5. `capture_screenshot`: capture the current rendered result on platforms that provide screenshot capture. For a native macOS app, use the AppKit hierarchy and node details.
 6. For exact assertions, use `check_node`, `check_node_detail`, `check_style`, or `check_layout`.
 
 Within one static inspection, reuse the same `appId` and `snapshotId` for hierarchy, lookup, detail, and assertion tools. A screenshot represents the latest state at capture time and is not guaranteed to be synchronized with an older snapshot.

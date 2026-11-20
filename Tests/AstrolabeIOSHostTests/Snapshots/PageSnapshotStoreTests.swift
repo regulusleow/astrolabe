@@ -104,6 +104,29 @@ final class PageSnapshotStoreTests: XCTestCase {
         XCTAssertEqual(permissions(at: lockURL), 0o600)
     }
 
+    func testMaximumLengthNodeIdentifiersCanPersistDistinctDetails() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = FilePageSnapshotStore(directoryURL: directory)
+        let snapshotID = UUID().uuidString
+        try store.saveHierarchy(PageHierarchySnapshot(
+            identifier: snapshotID, createdAt: Date(), appId: "app-1", platform: .ios,
+            hierarchy: hierarchy(snapshotID: snapshotID)
+        ))
+        let prefix = String(repeating: "😀", count: 255)
+        let identifiers = [String(repeating: "a", count: 256), prefix + "1", prefix + "2"]
+        for oid in identifiers {
+            try store.saveNodeDetail(PageNodeDetailSnapshot(
+                snapshotIdentifier: snapshotID, appId: "app-1", oid: oid,
+                capturedAt: Date(), detail: ["requestedOid": oid]
+            ))
+        }
+        for oid in identifiers {
+            let detail = try store.loadNodeDetail(snapshotIdentifier: snapshotID, appId: "app-1", oid: oid)
+            XCTAssertEqual(detail?.detail["requestedOid"] as? String, oid)
+        }
+    }
+
     func testStoreRejectsExpiredHierarchySnapshot() throws {
         let directoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

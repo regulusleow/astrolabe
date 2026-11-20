@@ -5,6 +5,7 @@
 //  Created by 轩辕十四 on 2026/7/14.
 //
 
+import CryptoKit
 import Foundation
 
 struct PageHierarchySnapshot {
@@ -322,10 +323,14 @@ struct FilePageSnapshotStore: PageSnapshotStoring {
     }
 
     private func detailFileName(for oid: String) -> String {
-        let encoded = Data(oid.utf8).base64EncodedString()
+        let data = Data(oid.utf8)
+        let encoded = data.base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
-        return "\(encoded).json"
+        let fileName = "\(encoded).json"
+        if fileName.utf8.count <= Int(NAME_MAX) { return fileName }
+        let digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        return "sha256.\(digest).json"
     }
 }

@@ -14,6 +14,144 @@ import Foundation
 import XCTest
 
 final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
+    func testDiscoveryTimeoutDoesNotBlockOtherAppsOrReuseProbeForInspection() throws {
+        let silent = FakeAstrolabeRuntimeClient()
+        silent.handshakeError = .timeout("Receive an Astrolabe Runtime response")
+        let discovered = FakeAstrolabeRuntimeClient()
+        discovered.handshakeValue = try makeHandshake()
+        discovered.appInfoValue = try makeAppInfo()
+        let session = FakeAstrolabeRuntimeClient()
+        session.handshakeValue = try makeHandshake()
+        session.appInfoValue = try makeAppInfo()
+        session.hierarchyValue = try makeHierarchy()
+        let probes = FakeAstrolabeRuntimeClientFactory(clients: [silent, discovered])
+        let sessions = FakeAstrolabeRuntimeClientFactory(clients: [session])
+        let endpoint = makeEndpoint()
+        let unavailable = AstrolabeRuntimeEndpoint(connectionKind: endpoint.connectionKind,
+            deviceId: endpoint.deviceId, host: endpoint.host, port: endpoint.port + 1)
+        let provider = AstrolabeIOSRuntimeProvider(
+            endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: [unavailable, endpoint]),
+            clientFactory: sessions, discoveryClientFactory: probes)
+
+        let apps = try provider.fetchApps()
+        XCTAssertEqual(apps.count, 1)
+        XCTAssertEqual(probes.createdEndpoints, [unavailable, endpoint])
+        XCTAssertTrue(sessions.createdEndpoints.isEmpty)
+        XCTAssertTrue(silent.calls.contains("close"))
+        XCTAssertTrue(discovered.calls.contains("close"))
+        _ = try provider.fetchHierarchy(appId: XCTUnwrap(apps.first).appId)
+        XCTAssertEqual(sessions.createdEndpoints, [endpoint])
+        XCTAssertTrue(session.calls.contains("hierarchy"))
+        XCTAssertFalse(discovered.calls.contains("hierarchy"))
+    }
+
+    func testCapableRuntimeBareOpaqueDetailRefusalNeverTriggersHierarchy() throws {
+        for code in [RuntimeErrorCode.invalidParameters, .nodeNotFound] {
+            let client = FakeAstrolabeRuntimeClient()
+            client.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .nodeDetail, .semanticInspection])
+            client.appInfoValue = try makeAppInfo()
+            client.hierarchyValue = try makeHierarchy()
+            client.nodeDetailError = .remote(RuntimeError(code: code, message: "Context unavailable", recoverySuggestion: nil))
+            let provider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [client]))
+            let appID = AstrolabeRuntimeAppID(endpoint: makeEndpoint(), runtimeInstanceIdentifier: "runtime-42").rawValue
+            XCTAssertThrowsError(try provider.fetchNodeDetail(appId: appID, oid: "opaque-Q7"))
+            XCTAssertEqual(client.calls.filter { $0 == "hierarchy" }.count, 0)
+            XCTAssertTrue(client.calls.contains("nodeDetail:opaque-Q7"))
+        }
+    }
+
+    func testCapableRuntimeRefusesUnboundSemanticContextAndPreflightsNativeWithoutCapture() throws {
+        let client = FakeAstrolabeRuntimeClient()
+        client.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .nodeDetail, .semanticInspection])
+        client.appInfoValue = try makeAppInfo()
+        client.hierarchyValue = try makeHierarchy()
+        let context = try RuntimeSemanticDetailContext(snapshotID: RuntimeOpaqueIdentifier(rawValue: "runtime-A"), capturedAtUnixTime: 100, source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .partial, issues: [], wasTruncated: false, textCandidates: [])
+        client.nodeDetailValue = RuntimeNodeDetailPayload(nodeID: try RuntimeOpaqueIdentifier(rawValue: "opaque-Q7"), sections: [], semanticContext: context)
+        let provider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [client]))
+        let appID = AstrolabeRuntimeAppID(endpoint: makeEndpoint(), runtimeInstanceIdentifier: "runtime-42").rawValue
+        XCTAssertThrowsError(try provider.preflightNativeNode(appId: appID, oid: "opaque-Q7"))
+        XCTAssertEqual(client.calls.filter { $0 == "hierarchy" }.count, 0)
+        client.nodeDetailValue = try makeNodeDetail()
+        try provider.preflightNativeNode(appId: appID, oid: "node-1")
+        XCTAssertEqual(client.calls.filter { $0 == "hierarchy" }.count, 0)
+    }
+    func testHierarchyResponseMustMatchRequestedSemanticScope() throws {
+        let client = FakeAstrolabeRuntimeClient()
+        client.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .semanticInspection])
+        client.appInfoValue = try makeAppInfo()
+        client.hierarchyValue = try makeHierarchy()
+        let provider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [client]))
+        let appID = AstrolabeRuntimeAppID(endpoint: makeEndpoint(), runtimeInstanceIdentifier: "runtime-42").rawValue
+        XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID, semanticCapture: RuntimeSemanticCaptureOptions()))
+        client.hierarchyValue = try makeHierarchy(semanticCapture: .init(
+            windowID: .init(rawValue: "window-1"), source: .init(rawValue: "ios.accessibility"),
+            availability: .unavailable, issues: [], visitedNodeCount: 0, wasTruncated: false, roots: []))
+        XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID))
+    }
+
+    func testSemanticResponseCannotChangeExplicitlyRequestedWindow() throws {
+        let client = FakeAstrolabeRuntimeClient()
+        client.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .semanticInspection])
+        client.appInfoValue = try makeAppInfo()
+        client.hierarchyValue = try makeHierarchy(semanticCapture: RuntimeSemanticCapture(windowID: RuntimeOpaqueIdentifier(rawValue: "window-3"), source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .unavailable, issues: [], visitedNodeCount: 0, wasTruncated: false, roots: []))
+        let provider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [client]))
+        let appID = AstrolabeRuntimeAppID(endpoint: makeEndpoint(), runtimeInstanceIdentifier: "runtime-42").rawValue
+        XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID, semanticCapture: RuntimeSemanticCaptureOptions(windowID: RuntimeOpaqueIdentifier(rawValue: "window-2"))))
+    }
+
+    func testRemoteErrorKeepsTypedWindowDiagnosticsThroughCLIEnvelope() throws {
+        let window = try RuntimeInspectionWindow(windowID: RuntimeOpaqueIdentifier(rawValue: "window-2"), runtimeType: RuntimeType(name: "UIWindow", ancestors: []))
+        let extensions = try RuntimeExtensionMap(inspectionTargets: [window])
+        let error = AstrolabeRuntimeClientError.remote(RuntimeError(code: try RuntimeErrorCode(rawValue: "inspection.targetAmbiguous"), message: "Ambiguous window", recoverySuggestion: "Choose windowId", extensions: extensions))
+        let envelope = CommandResult<EmptyPayload>(success: false, error: error.description, data: nil, command: "capture-hierarchy", errorCode: error.errorCode, recoverySuggestion: error.errorRecoverySuggestion, extensions: error.errorExtensions)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(envelope)) as? [String: Any])
+        let diagnostic = try XCTUnwrap(object["extensions"] as? [String: Any])
+        XCTAssertEqual((diagnostic["common.inspectionTargets"] as? [[String: Any]])?.first?["windowID"] as? String, "window-2")
+        XCTAssertNil(object["data"])
+    }
+
+    func testSemanticCaptureRequiresCapabilityAndForwardsExplicitWindowAndFrozenSnapshot() throws {
+        let client = FakeAstrolabeRuntimeClient()
+        client.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .nodeDetail])
+        client.appInfoValue = try makeAppInfo()
+        client.hierarchyValue = try makeHierarchy()
+        client.nodeDetailValue = try makeNodeDetail()
+        let provider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [client]))
+        let appID = AstrolabeRuntimeAppID(endpoint: makeEndpoint(), runtimeInstanceIdentifier: "runtime-42").rawValue
+        XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID, semanticCapture: RuntimeSemanticCaptureOptions(windowID: try RuntimeOpaqueIdentifier(rawValue: "window-2"))))
+        XCTAssertFalse(client.calls.contains("hierarchy"))
+
+        let supported = FakeAstrolabeRuntimeClient()
+        supported.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .nodeDetail, .semanticInspection])
+        supported.appInfoValue = try makeAppInfo()
+        supported.hierarchyValue = try makeHierarchy(semanticCapture: RuntimeSemanticCapture(windowID: RuntimeOpaqueIdentifier(rawValue: "window-2"), source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .unavailable, issues: [], visitedNodeCount: 0, wasTruncated: false, roots: []))
+        supported.nodeDetailValue = try makeNodeDetail()
+        let supportedProvider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [supported]))
+        _ = try supportedProvider.fetchHierarchy(appId: appID, semanticCapture: RuntimeSemanticCaptureOptions(windowID: try RuntimeOpaqueIdentifier(rawValue: "window-2")))
+        XCTAssertEqual(supported.semanticWindowID, "window-2")
+        let captures = supported.calls.filter { $0 == "hierarchy" }.count
+        _ = try supportedProvider.fetchNodeDetail(appId: appID, oid: "semantic-A-1", runtimeSnapshotID: "runtime-A")
+        XCTAssertEqual(supported.frozenSnapshotID, "runtime-A")
+        XCTAssertEqual(supported.calls.filter { $0 == "hierarchy" }.count, captures)
+    }
+
+    func testMapperPreservesTypedSemanticContextExtensionsAndUnknownRenderFacts() throws {
+        let context = try RuntimeSemanticDetailContext(snapshotID: RuntimeOpaqueIdentifier(rawValue: "runtime-A"), capturedAtUnixTime: 100, source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .partial, issues: [], wasTruncated: false, textCandidates: [])
+        let detail = RuntimeNodeDetailPayload(nodeID: try RuntimeOpaqueIdentifier(rawValue: "semantic-A-1"), sections: [], extensions: try RuntimeExtensionMap(values: ["vendor.test": .boolean(true)]), semanticContext: context)
+        let mapped = AstrolabeRuntimeResponseMapper().nodeDetail(appID: "app", requestedNodeID: try RuntimeOpaqueIdentifier(rawValue: "semantic-A-1"), detail: detail)
+        XCTAssertEqual((mapped["semanticContext"] as? [String: Any])?["snapshotID"] as? String, "runtime-A")
+        XCTAssertEqual((mapped["extensions"] as? [String: Any])?["vendor.test"] as? Bool, true)
+        let base = try makeHierarchy()
+        let semantic = try RuntimeSemanticNode(nodeID: RuntimeOpaqueIdentifier(rawValue: "semantic-A-1"), parentID: nil, siblingIndex: 0, role: "text", runtimeType: RuntimeType(name: "SwiftUI.AccessibilityNode", ancestors: []), availableDetailCategories: [], children: [])
+        let capture = try RuntimeSemanticCapture(windowID: RuntimeOpaqueIdentifier(rawValue: "window-2"), source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .partial, issues: [], visitedNodeCount: 1, wasTruncated: false, roots: [semantic])
+        let snapshot = RuntimeHierarchySnapshotPayload(snapshotID: base.snapshotID, capturedAtUnixTime: base.capturedAtUnixTime, targetIdentifier: base.targetIdentifier, orientation: base.orientation, display: base.display, viewport: base.viewport, roots: base.roots, semanticCapture: capture)
+        let hierarchy = AstrolabeRuntimeResponseMapper().hierarchy(appID: "app", handshake: try makeHandshake(), appInfo: try makeAppInfo(), snapshot: snapshot)
+        let node = try XCTUnwrap((hierarchy["semanticItems"] as? [[String: Any]])?.first)
+        XCTAssertEqual(node["kind"] as? String, "semantic")
+        XCTAssertEqual(node["className"] as? String, "SwiftUI.AccessibilityNode")
+        for key in ["visible", "alpha", "hidden", "bounds", "frame"] { XCTAssertNil(node[key], key) }
+    }
+
     func testProviderRoutesMarkedSimulatorAndUSBAppIDs() {
         let endpoint = makeEndpoint()
         let appID = AstrolabeRuntimeAppID(
@@ -47,6 +185,30 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         XCTAssertFalse(
             provider.canHandle(appId: "simulator:simulator:47164:42")
         )
+    }
+
+    func testMapperPreservesProvenSemanticVisibility() throws {
+        let base = try makeHierarchy()
+        for opacity in [1.0, 0.005] {
+            let visibility = try RuntimeNodeVisibility(hidden: false, hiddenByAncestor: false, opacity: 1,
+                effectiveOpacity: opacity, intersectsViewport: true, fullyClippedByAncestor: false, onscreen: opacity > 0.01)
+            let node = try RuntimeSemanticNode(nodeID: RuntimeOpaqueIdentifier(rawValue: "semantic-visible"),
+                parentID: nil, siblingIndex: 0, role: "text", runtimeType: RuntimeType(name: "SwiftUI.AccessibilityNode", ancestors: []),
+                visibility: visibility, availableDetailCategories: [], children: [])
+            let capture = try RuntimeSemanticCapture(windowID: RuntimeOpaqueIdentifier(rawValue: "window-2"),
+                source: RuntimeNamespacedIdentifier(rawValue: "ios.accessibility"), availability: .complete,
+                issues: [], visitedNodeCount: 1, wasTruncated: false, roots: [node])
+            let snapshot = RuntimeHierarchySnapshotPayload(snapshotID: base.snapshotID, capturedAtUnixTime: base.capturedAtUnixTime,
+                targetIdentifier: base.targetIdentifier, orientation: base.orientation, display: base.display,
+                viewport: base.viewport, roots: base.roots, semanticCapture: capture)
+            let mapped = AstrolabeRuntimeResponseMapper().hierarchy(appID: "app", handshake: try makeHandshake(), appInfo: try makeAppInfo(), snapshot: snapshot)
+            let actual = try XCTUnwrap((mapped["semanticItems"] as? [[String: Any]])?.first)
+            XCTAssertEqual(actual["kind"] as? String, "semantic")
+            XCTAssertEqual(actual["visible"] as? Bool, opacity > 0.01)
+            XCTAssertEqual(actual["onscreen"] as? Bool, opacity > 0.01)
+            XCTAssertEqual(actual["hierarchyVisible"] as? Bool, opacity > 0.01)
+            XCTAssertEqual(actual["effectiveAlpha"] as? Double, opacity)
+        }
     }
 
     func testRuntimeAppIDRoundTripsOpaqueInstanceIdentifier() throws {
@@ -791,7 +953,8 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
     }
 
     private func makeHierarchy(
-        relations: [RuntimeNodeRelation]? = nil
+        relations: [RuntimeNodeRelation]? = nil,
+        semanticCapture: RuntimeSemanticCapture? = nil
     ) throws -> RuntimeHierarchySnapshotPayload {
         RuntimeHierarchySnapshotPayload(
             snapshotID: try RuntimeOpaqueIdentifier(rawValue: "snapshot-1"),
@@ -843,7 +1006,8 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
                 )
             ],
             relations: relations,
-            extensions: nil
+            extensions: nil,
+            semanticCapture: semanticCapture
         )
     }
 
@@ -979,6 +1143,18 @@ private final class FakeAstrolabeRuntimeClientFactory:
 }
 
 private final class FakeAstrolabeRuntimeClient: AstrolabeRuntimeClient {
+    /// Direct node-detail refusal returned by the scripted Runtime.
+    var nodeDetailError: AstrolabeRuntimeClientError?
+    var semanticWindowID: String?
+    var frozenSnapshotID: String?
+    func hierarchySnapshot(semanticCapture: RuntimeSemanticCaptureOptions?) throws -> RuntimeHierarchySnapshotPayload {
+        semanticWindowID = semanticCapture?.windowID?.rawValue
+        return try hierarchySnapshot()
+    }
+    func nodeDetail(nodeID: RuntimeOpaqueIdentifier, snapshotID: RuntimeOpaqueIdentifier?) throws -> RuntimeNodeDetailPayload {
+        frozenSnapshotID = snapshotID?.rawValue
+        return try nodeDetail(nodeID: nodeID)
+    }
     var handshakeError: AstrolabeRuntimeClientError?
     var handshakeValue: RuntimeHandshakePayload?
     var appInfoValue: RuntimeApplicationInfoPayload?
@@ -1031,6 +1207,7 @@ private final class FakeAstrolabeRuntimeClient: AstrolabeRuntimeClient {
 
     func nodeDetail(nodeID: RuntimeOpaqueIdentifier) throws -> RuntimeNodeDetailPayload {
         calls.append("nodeDetail:\(nodeID.rawValue)")
+        if let nodeDetailError { throw nodeDetailError }
         guard let nodeDetailValue else {
             throw AstrolabeRuntimeClientError.invalidResponse(
                 "Test client has no nodeDetailValue"

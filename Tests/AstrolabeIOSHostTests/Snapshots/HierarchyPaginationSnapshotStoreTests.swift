@@ -182,6 +182,7 @@ final class HierarchyPaginationSnapshotStoreTests: XCTestCase {
             appId: "app-1",
             pageSnapshotIdentifier: UUID().uuidString,
             pageCapturedAt: createdAt,
+            semanticMetadata: [:],
             queryFingerprint: "query",
             snapshotFingerprint: "snapshot",
             nodes: [[

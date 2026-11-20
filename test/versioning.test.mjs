@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -33,7 +34,7 @@ test("release version comparison uses numeric semantic components", () => {
   assert.equal(compareReleaseVersions("1.0.0", "1.0.0"), 0);
 });
 
-test("version synchronization updates every derived version artifact", () => {
+test("version synchronization updates release metadata and preserves local documentation", () => {
   const fixture = makeVersionFixture();
   try {
     const updatedPaths = synchronizeRepositoryVersion(fixture.root, "0.2.0");
@@ -59,9 +60,23 @@ test("version synchronization updates every derived version artifact", () => {
     );
     assert.match(
       readFileSync(join(fixture.root, fixture.documentationPath), "utf8"),
-      /`astrolabe 0\.2\.0`/
+      /`astrolabe 0\.1\.2`/
     );
     assert.deepEqual(versionConsistencyIssues(fixture.root), []);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("version checks and synchronization work without local documentation", () => {
+  const fixture = makeVersionFixture();
+  try {
+    rmSync(join(fixture.root, "docs"), { recursive: true });
+    assert.doesNotThrow(() => versionConsistencyIssues(fixture.root));
+    assert.deepEqual(versionConsistencyIssues(fixture.root), []);
+    assert.deepEqual(synchronizeRepositoryVersion(fixture.root, "0.2.0"), fixture.expectedVersionedPaths);
+    assert.deepEqual(versionConsistencyIssues(fixture.root), []);
+    assert.equal(existsSync(join(fixture.root, "docs")), false);
   } finally {
     fixture.cleanup();
   }
@@ -88,7 +103,7 @@ test("version synchronization validates every artifact before writing", () => {
   const fixture = makeVersionFixture();
   try {
     writeFileSync(
-      join(fixture.root, fixture.documentationPath),
+      join(fixture.root, fixture.swiftPath),
       "missing product version\n"
     );
 
@@ -393,7 +408,6 @@ function makeVersionFixture() {
   const documentationPath = "docs/protocol-architecture.md";
   const expectedVersionedPaths = [
     "Sources/AstrolabeCLI/CommandLine/AstrolabeHostMetadata.swift",
-    "docs/protocol-architecture.md",
     "mcp-adapter/package-lock.json",
     "mcp-adapter/package.json",
     "package-lock.json",

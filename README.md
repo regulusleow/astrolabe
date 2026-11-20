@@ -6,14 +6,17 @@ Astrolabe is a runtime UI inspection tool for AI coding agents. It combines a
 Swift CLI, a local MCP server, and a packaged agent skill to inspect and verify
 running mobile interfaces.
 
-Android View inspection is supported through Astrolabe Runtime for Android 2.0.
+Android View inspection uses
+[Astrolabe Runtime for Android](https://github.com/regulusleow/astrolabe-runtime-android).
 
 ## Features
 
 - Discover supported apps running in iOS simulators, Android emulators, or on
   USB-connected devices.
-- Inspect UIKit and Android View hierarchies, node frames, visibility, text,
-  styles, semantic roles, and detailed runtime attributes.
+- Inspect UIKit, Core Animation, and Android View hierarchies, node frames,
+  visibility, text, styles, semantic roles, and detailed runtime attributes.
+- Inspect SwiftUI semantic nodes, text styles, linear gradients, image metadata, and
+  basic text visibility.
 - Capture native-resolution screenshots and compare them with expected images
   or recorded baselines.
 - Query nodes and verify style, layout, and node-detail expectations.
@@ -25,8 +28,7 @@ Android View inspection is supported through Astrolabe Runtime for Android 2.0.
 
 ## Requirements
 
-- macOS 13 or later
-- Swift 5.9 or later
+- An Apple silicon Mac running macOS 13 or later
 - Node.js 22 or later
 - Android Platform Tools (ADB) when inspecting Android apps
 - A supported app with an Astrolabe Runtime SDK enabled in Debug builds
@@ -56,8 +58,8 @@ astrolabe install --all-detected
 Homebrew lifecycle operations do not modify AI-client configuration. Restart
 the configured AI clients after running `astrolabe install`.
 
-To install from source, clone the repository, then install Astrolabe for the AI
-clients you use:
+Source builds require Xcode with Swift 5.9 or later. Clone the repository, then
+install Astrolabe for the AI clients you use:
 
 ```bash
 git clone https://github.com/regulusleow/astrolabe.git
@@ -83,7 +85,16 @@ not remove another client's configuration or required skill link.
 
 Restart the configured AI clients after installation.
 
-Installation management commands:
+For Homebrew installations, use the installed CLI to check or remove an AI
+client's Astrolabe integration. These examples use Codex; replace `codex` with
+`opencode` or `claude-code` as needed:
+
+```bash
+astrolabe check --client codex
+astrolabe uninstall --client codex
+```
+
+For source installations, run these management commands from the cloned repository:
 
 ```bash
 npm run reinstall:codex
@@ -101,7 +112,8 @@ npm run uninstall:claude-code
 
 ## Quick Start
 
-Launch a Debug build that includes a supported Runtime SDK, then discover it:
+Launch a Debug build that includes a supported Runtime SDK and keep it in the
+foreground while capturing UI. Discover the app:
 
 ```bash
 astrolabe list-apps --json
@@ -118,14 +130,37 @@ astrolabe node-detail <app-id> <oid> --json
 astrolabe capture-screenshot <app-id> --output /tmp/screen.png --source auto --json
 ```
 
-Hierarchy commands return a `snapshotId`. Pass it to subsequent hierarchy,
-node, style, and layout commands to keep the workflow bound to the captured
-page. Screenshot and visual comparison commands always use the latest screen.
+Hierarchy commands return a `snapshotId`. Reuse it in subsequent queries to use
+the same captured hierarchy. SwiftUI semantic details come from the corresponding
+frozen capture. Native node details are read from the live Runtime on first lookup
+and then cached for that snapshot. Screenshot and visual comparison commands
+always use the latest screen.
 
 The installed MCP server exposes the same capabilities to Codex, OpenCode, and
-Claude Code. The bundled skill guides app discovery, snapshot reuse, node
-selection, runtime checks, screenshots, visual comparison, and temporary
-presentation experiments.
+Claude Code. The bundled skill guides read-only UI inspection and comparison
+with developer-provided design references.
+
+### SwiftUI
+
+Use an iOS Runtime that supports SwiftUI inspection. Add `--include-semantics`
+when capturing, then reuse the returned `snapshotId` to find and inspect SwiftUI nodes:
+
+```bash
+astrolabe capture-hierarchy <app-id> --include-semantics --json
+astrolabe find-nodes <app-id> --snapshot-id <page-snapshot-id> --role text --json
+astrolabe inspect-node <app-id> --snapshot-id <page-snapshot-id> --oid <semantic-oid> --json
+astrolabe check-style <app-id> --snapshot-id <page-snapshot-id> --oid <semantic-oid> --expect fontSize 28 --json
+```
+
+If multiple eligible windows exist, add `--window-id <window-id>` to the capture
+command. SwiftUI node details belong to that snapshot; keep its `snapshotId`
+with the node ID for subsequent inspection.
+
+With MCP, set `includeSemantics: true` on `capture_hierarchy`, then pass its
+returned `snapshotId` to `find_nodes` and `inspect_node`.
+
+`--visible-only` includes only nodes with confirmed basic visibility. Missing or
+ambiguous style information returns `verification=unableToVerify`.
 
 ## Development
 
@@ -157,7 +192,7 @@ npm run test:usb
   platform-neutral Wire Protocol, Schemas, Fixtures, and Swift/Kotlin DTOs and
   Codecs.
 - [astrolabe-runtime-ios](https://github.com/regulusleow/astrolabe-runtime-ios):
-  Debug-only UIKit Runtime SDK.
+  Runtime SDK for UIKit, Core Animation, and SwiftUI inspection in Debug builds.
 - [astrolabe-runtime-android](https://github.com/regulusleow/astrolabe-runtime-android):
   Debug-only Android View Runtime SDK.
 

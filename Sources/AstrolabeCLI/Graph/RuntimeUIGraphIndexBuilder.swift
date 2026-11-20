@@ -93,6 +93,8 @@ struct RuntimeUIGraphIndexBuilder {
             return RuntimeUIGraphBuiltInRelation.viewChild
         case .layer:
             return RuntimeUIGraphBuiltInRelation.layerChild
+        case .semantic:
+            return RuntimeUIGraphBuiltInRelation.semanticChild
         }
     }
 

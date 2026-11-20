@@ -69,14 +69,33 @@ package protocol RuntimeApplicationDiscovering {
 
 package protocol RuntimeUIHierarchyCapturing {
     func fetchHierarchy(appId: String) throws -> [String: Any]
+    func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any]
+}
+
+extension RuntimeUIHierarchyCapturing {
+    package func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
+        guard semanticCapture == nil else {
+            throw RuntimeError(code: .capabilityUnavailable, message: "Semantic inspection unavailable", recoverySuggestion: "Use a Runtime advertising semanticInspection")
+        }
+        return try fetchHierarchy(appId: appId)
+    }
 }
 
 package protocol RuntimeUINodeDetailProviding {
+    /// Validate an exact bare node through a request-only native detail read when the Runtime supports semantics.
+    func preflightNativeNode(appId: String, oid: String) throws
     func fetchNodeDetail(appId: String, oid: String) throws -> [String: Any]
+    func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any]
     func fetchNodeDetails(appId: String, oids: [String]) throws -> RuntimeNodeDetailBatch
 }
 
 extension RuntimeUINodeDetailProviding {
+    package func preflightNativeNode(appId: String, oid: String) throws {}
+
+    package func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+        throw RuntimeError(code: .capabilityUnavailable, message: "Frozen semantic detail unavailable", recoverySuggestion: "Use a Runtime advertising semanticInspection")
+    }
+
     package func fetchNodeDetails(
         appId: String,
         oids: [String]

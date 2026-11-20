@@ -35,6 +35,9 @@ struct HierarchyProjectionBuilder {
             options: options,
             returnedNodeCount: &returnedNodeCount
         )
+        if hierarchy["semanticItems"] != nil {
+            result["semanticItems"] = projectNodes(hierarchy["semanticItems"], depth: 0, options: options, returnedNodeCount: &returnedNodeCount)
+        }
         result["nodeCount"] = nodeCount
         result["returnedNodeCount"] = returnedNodeCount
         result["omittedNodeCount"] = max(0, nodeCount - returnedNodeCount)

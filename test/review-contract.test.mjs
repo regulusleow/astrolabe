@@ -139,7 +139,7 @@ test("public documentation advertises delivered Android View support", async () 
   assert.match(readme, /Android View/);
   assert.match(readme, /ADB/);
   assert.match(readme, /astrolabe-runtime-android/);
-  assert.match(readme, /Runtime for Android 2\.0/);
+  assert.ok(readme.includes("[Astrolabe Runtime for Android](https://github.com/regulusleow/astrolabe-runtime-android)"));
   assert.doesNotMatch(readme, /release preparation/);
   assert.doesNotMatch(readme, /- Android Runtime and Host support\./);
   assert.match(skillMetadata, /running mobile app/);

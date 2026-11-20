@@ -100,13 +100,19 @@ package enum AstrolabeRuntimeClientError: Error, CustomStringConvertible {
 extension AstrolabeRuntimeClientError: CLIErrorMetadataProviding {
     package var errorCode: String { code }
     package var errorRecoverySuggestion: String { recoverySuggestion }
+    package var errorExtensions: RuntimeExtensionMap? {
+        guard case let .remote(error) = self else { return nil }
+        return error.extensions
+    }
 }
 
 package protocol AstrolabeRuntimeClient: AnyObject {
     func handshake() throws -> RuntimeHandshakePayload
     func appInfo() throws -> RuntimeApplicationInfoPayload
     func hierarchySnapshot() throws -> RuntimeHierarchySnapshotPayload
+    func hierarchySnapshot(semanticCapture: RuntimeSemanticCaptureOptions?) throws -> RuntimeHierarchySnapshotPayload
     func nodeDetail(nodeID: RuntimeOpaqueIdentifier) throws -> RuntimeNodeDetailPayload
+    func nodeDetail(nodeID: RuntimeOpaqueIdentifier, snapshotID: RuntimeOpaqueIdentifier?) throws -> RuntimeNodeDetailPayload
     func patchableAttributes() throws -> RuntimePatchableAttributesPayload
     func applyAttributePatch(
         _ parameters: RuntimeApplyAttributePatchParameters
@@ -117,6 +123,18 @@ package protocol AstrolabeRuntimeClient: AnyObject {
     ) throws -> RuntimeRevertAttributePatchPayload
     func clearAttributePatches() throws -> RuntimeClearAttributePatchesPayload
     func close()
+}
+
+extension AstrolabeRuntimeClient {
+    package func hierarchySnapshot(semanticCapture: RuntimeSemanticCaptureOptions?) throws -> RuntimeHierarchySnapshotPayload {
+        guard semanticCapture == nil else { throw AstrolabeRuntimeClientError.remote(RuntimeError(code: .capabilityUnavailable, message: "Semantic capture unavailable", recoverySuggestion: nil)) }
+        return try hierarchySnapshot()
+    }
+
+    package func nodeDetail(nodeID: RuntimeOpaqueIdentifier, snapshotID: RuntimeOpaqueIdentifier?) throws -> RuntimeNodeDetailPayload {
+        guard snapshotID == nil else { throw AstrolabeRuntimeClientError.remote(RuntimeError(code: .capabilityUnavailable, message: "Frozen semantic detail unavailable", recoverySuggestion: nil)) }
+        return try nodeDetail(nodeID: nodeID)
+    }
 }
 
 package protocol AstrolabeRuntimeClientCreating {
@@ -198,20 +216,28 @@ package final class AstrolabeRuntimeProtocolClient: AstrolabeRuntimeClient {
     }
 
     package func hierarchySnapshot() throws -> RuntimeHierarchySnapshotPayload {
+        try hierarchySnapshot(semanticCapture: nil)
+    }
+
+    package func hierarchySnapshot(semanticCapture: RuntimeSemanticCaptureOptions?) throws -> RuntimeHierarchySnapshotPayload {
         try ensureHandshake()
         return try request(
             method: .hierarchySnapshot,
-            parameters: RuntimeHierarchySnapshotParameters()
+            parameters: RuntimeHierarchySnapshotParameters(semanticCapture: semanticCapture)
         )
     }
 
     package func nodeDetail(
         nodeID: RuntimeOpaqueIdentifier
     ) throws -> RuntimeNodeDetailPayload {
+        try nodeDetail(nodeID: nodeID, snapshotID: nil)
+    }
+
+    package func nodeDetail(nodeID: RuntimeOpaqueIdentifier, snapshotID: RuntimeOpaqueIdentifier?) throws -> RuntimeNodeDetailPayload {
         try ensureHandshake()
         return try request(
             method: .nodeDetail,
-            parameters: RuntimeNodeDetailParameters(nodeID: nodeID)
+            parameters: RuntimeNodeDetailParameters(nodeID: nodeID, snapshotID: snapshotID)
         )
     }
 

@@ -260,14 +260,15 @@ package struct CLICommandRunner {
             try output.print()
             return 0
         } catch {
-            NSLog("Failed: \(error)")
+            NSLog("命令执行失败")
             try? JSONOutput.printJSON(CommandResult<EmptyPayload>(
                 success: false,
                 error: String(describing: error),
                 data: nil,
                 command: arguments.first,
                 errorCode: CLIError.code(for: error),
-                recoverySuggestion: CLIError.recoverySuggestion(for: error)
+                recoverySuggestion: CLIError.recoverySuggestion(for: error),
+                extensions: (error as? any CLIErrorMetadataProviding)?.errorExtensions
             ))
             return 1
         }

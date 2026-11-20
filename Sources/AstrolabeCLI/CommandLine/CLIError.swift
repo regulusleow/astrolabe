@@ -6,10 +6,23 @@
 //
 
 import Foundation
+import AstrolabeProtocol
 
 package protocol CLIErrorMetadataProviding: Error {
     var errorCode: String { get }
     var errorRecoverySuggestion: String { get }
+    /// Typed namespaced diagnostics preserved without UI values on refusal.
+    var errorExtensions: RuntimeExtensionMap? { get }
+}
+
+extension CLIErrorMetadataProviding {
+    package var errorExtensions: RuntimeExtensionMap? { nil }
+}
+
+extension RuntimeError: CLIErrorMetadataProviding {
+    package var errorCode: String { "astrolabe_runtime_\(code.rawValue)" }
+    package var errorRecoverySuggestion: String { recoverySuggestion ?? "Follow Runtime diagnostics" }
+    package var errorExtensions: RuntimeExtensionMap? { extensions }
 }
 
 package enum CLIError: Error, CustomStringConvertible {

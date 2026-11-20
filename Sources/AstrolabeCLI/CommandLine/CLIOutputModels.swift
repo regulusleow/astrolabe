@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import AstrolabeProtocol
 
 enum CLIOutputSchema {
     static let currentVersion = 4
@@ -33,6 +34,9 @@ struct CommandResult<Payload: Encodable>: Encodable {
     /// Data returned by the command.
     let data: Payload?
 
+    /// Typed namespaced Runtime diagnostics, including inspection target inventories.
+    let extensions: RuntimeExtensionMap?
+
     init(
         success: Bool,
         error: String?,
@@ -40,7 +44,8 @@ struct CommandResult<Payload: Encodable>: Encodable {
         schemaVersion: Int = CLIOutputSchema.currentVersion,
         command: String? = nil,
         errorCode: String? = nil,
-        recoverySuggestion: String? = nil
+        recoverySuggestion: String? = nil,
+        extensions: RuntimeExtensionMap? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.command = command
@@ -49,6 +54,7 @@ struct CommandResult<Payload: Encodable>: Encodable {
         self.error = error
         self.recoverySuggestion = recoverySuggestion
         self.data = data
+        self.extensions = extensions
     }
 }
 struct EmptyPayload: Encodable {

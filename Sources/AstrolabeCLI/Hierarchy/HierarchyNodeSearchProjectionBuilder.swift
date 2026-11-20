@@ -13,6 +13,11 @@ struct HierarchyNodeSearchProjectionBuilder {
     }
 
     func buildProjection(from record: HierarchyNodeRecord) -> [String: Any] {
+        if record.node["kind"] as? String == "semantic" {
+            var result = extractor.nodeSnapshot(from: record)
+            result.removeValue(forKey: "customDisplayTitle")
+            return result
+        }
         var projection: [String: Any] = [
             "oid": extractor.nodeIdentifier(from: record.node["oid"]) ?? "",
             "detailOid": extractor.nodeIdentifier(from: record.node["detailOid"])

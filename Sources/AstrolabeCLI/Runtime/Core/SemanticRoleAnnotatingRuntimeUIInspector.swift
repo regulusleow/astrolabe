@@ -33,11 +33,12 @@ struct SemanticRoleAnnotatingRuntimeUIInspector: RuntimeUIInspecting {
     }
 
     func fetchHierarchy(appId: String) throws -> [String: Any] {
-        let hierarchy = try base.fetchHierarchy(appId: appId)
+        try fetchHierarchy(appId: appId, semanticCapture: nil)
+    }
+
+    func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
+        let hierarchy = try base.fetchHierarchy(appId: appId, semanticCapture: semanticCapture)
         let platform = try base.platform(for: appId)
-        guard let displayItems = hierarchy["displayItems"] else {
-            return hierarchy
-        }
         var resolvedClassifiers: [any NodeSemanticRoleClassifying] = [
             NodeSemanticRoleClassifier()
         ]
@@ -45,15 +46,24 @@ struct SemanticRoleAnnotatingRuntimeUIInspector: RuntimeUIInspecting {
             resolvedClassifiers.append(platformClassifier)
         }
         var result = hierarchy
-        result["displayItems"] = annotate(
-            value: displayItems,
-            classifiers: resolvedClassifiers
-        )
+        for branch in ["displayItems", "semanticItems"] {
+            if let items = hierarchy[branch] {
+                result[branch] = annotate(value: items, classifiers: resolvedClassifiers)
+            }
+        }
         return result
     }
 
     func fetchNodeDetail(appId: String, oid: String) throws -> [String: Any] {
         try base.fetchNodeDetail(appId: appId, oid: oid)
+    }
+
+    func preflightNativeNode(appId: String, oid: String) throws {
+        try base.preflightNativeNode(appId: appId, oid: oid)
+    }
+
+    func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+        try base.fetchNodeDetail(appId: appId, oid: oid, runtimeSnapshotID: runtimeSnapshotID)
     }
 
     func fetchNodeDetails(appId: String, oids: [String]) throws -> RuntimeNodeDetailBatch {
@@ -102,7 +112,11 @@ struct SemanticRoleAnnotatingRuntimeUIInspector: RuntimeUIInspecting {
         guard var node = value as? [String: Any] else {
             return value
         }
-        if node["className"] is String {
+        if node["kind"] as? String == "semantic" {
+            node["semanticRoles"] = NodeSemanticRoleClassifier().roles(for: node)
+                .map(\.rawValue)
+                .sorted()
+        } else if node["className"] is String {
             let existingRoles = Set(
                 (node["semanticRoles"] as? [String] ?? [])
                     .compactMap(NodeSemanticRole.init(rawValue:))

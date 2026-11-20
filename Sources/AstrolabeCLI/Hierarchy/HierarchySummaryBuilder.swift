@@ -52,6 +52,12 @@ struct HierarchySummaryBuilder {
         if let hierarchyServerVersion = hierarchy["hierarchyServerVersion"] {
             summary["hierarchyServerVersion"] = hierarchyServerVersion
         }
+        if hierarchy["semanticItems"] != nil {
+            let semanticRecords = records.filter { $0.node["kind"] as? String == "semantic" }
+            summary["semanticNodeCount"] = semanticRecords.count
+            summary["semanticItems"] = semanticRecords.prefix(visibleNodeLimit).map { extractor.nodeSnapshot(from: $0) }
+            summary["omittedSemanticNodeCount"] = max(0, semanticRecords.count - visibleNodeLimit)
+        }
         return summary
     }
 }

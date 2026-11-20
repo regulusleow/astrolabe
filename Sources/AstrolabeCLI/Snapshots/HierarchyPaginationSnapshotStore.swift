@@ -23,6 +23,9 @@ struct HierarchyNodeSearchSnapshot {
     /// Capture time of the page hierarchy snapshot.
     let pageCapturedAt: Date
 
+    /// Original Runtime capture identity, timestamp, and completeness shared by every page.
+    let semanticMetadata: [String: Any]
+
     /// Node-query fingerprint bound to the snapshot.
     let queryFingerprint: String
 
@@ -76,7 +79,7 @@ struct FileHierarchyPaginationSnapshotStore: HierarchyPaginationSnapshotStoring 
     func save(_ snapshot: HierarchyNodeSearchSnapshot) throws {
         try storageCoordinator.withExclusiveAccess {
             removeExpiredSnapshots()
-            let object: [String: Any] = [
+            var object: [String: Any] = [
                 "schemaVersion": Self.schemaVersion,
                 "identifier": snapshot.identifier,
                 "createdAtUnixTime": snapshot.createdAt.timeIntervalSince1970,
@@ -87,6 +90,7 @@ struct FileHierarchyPaginationSnapshotStore: HierarchyPaginationSnapshotStoring 
                 "snapshotFingerprint": snapshot.snapshotFingerprint,
                 "nodes": snapshot.nodes
             ]
+            object.merge(snapshot.semanticMetadata) { stored, _ in stored }
             guard JSONSerialization.isValidJSONObject(object) else {
                 throw CLIError.invalidJSONObject
             }
@@ -136,6 +140,7 @@ struct FileHierarchyPaginationSnapshotStore: HierarchyPaginationSnapshotStoring 
             appId: appId,
             pageSnapshotIdentifier: pageSnapshotIdentifier,
             pageCapturedAt: Date(timeIntervalSince1970: pageCapturedAtUnixTime),
+            semanticMetadata: ResolvedPageHierarchy.semanticMetadata(in: object),
             queryFingerprint: queryFingerprint,
             snapshotFingerprint: snapshotFingerprint,
             nodes: nodes

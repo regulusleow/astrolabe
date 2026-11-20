@@ -31,7 +31,8 @@ package final class AstrolabeIOSRuntimeProvider:
     )
 
     private let endpointDiscovery: any AstrolabeRuntimeEndpointDiscovering
-    private let clientFactory: any AstrolabeRuntimeClientCreating
+    /// Short-lived discovery probes must not inherit the inspection request timeout.
+    private let discoveryClientFactory: any AstrolabeRuntimeClientCreating
     private let mapper: AstrolabeRuntimeResponseMapper
     private let compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy
     private let sessionStore: AstrolabeRuntimeSessionStore
@@ -44,11 +45,8 @@ package final class AstrolabeIOSRuntimeProvider:
                 SimulatorAstrolabeRuntimeEndpointDiscovery(),
                 USBMuxAstrolabeRuntimeEndpointDiscovery()
             ]),
-        clientFactory: any AstrolabeRuntimeClientCreating =
-            AstrolabeRuntimeProtocolClientFactory(
-                transportFactory: DefaultAstrolabeRuntimeTransportFactory(),
-                runtimePackageName: "astrolabe-runtime-ios"
-            ),
+        clientFactory: (any AstrolabeRuntimeClientCreating)? = nil,
+        discoveryClientFactory: (any AstrolabeRuntimeClientCreating)? = nil,
         mapper: AstrolabeRuntimeResponseMapper = AstrolabeRuntimeResponseMapper(),
         compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy =
             AstrolabeRuntimeCompatibilityPolicy(
@@ -57,11 +55,17 @@ package final class AstrolabeIOSRuntimeProvider:
             )
     ) {
         self.endpointDiscovery = endpointDiscovery
-        self.clientFactory = clientFactory
+        self.discoveryClientFactory = discoveryClientFactory ?? clientFactory ?? AstrolabeRuntimeProtocolClientFactory(
+            transportFactory: DefaultAstrolabeRuntimeTransportFactory(requestTimeout: 1),
+            runtimePackageName: "astrolabe-runtime-ios"
+        )
         self.mapper = mapper
         self.compatibilityPolicy = compatibilityPolicy
         sessionStore = AstrolabeRuntimeSessionStore(
-            clientFactory: clientFactory,
+            clientFactory: clientFactory ?? AstrolabeRuntimeProtocolClientFactory(
+                transportFactory: DefaultAstrolabeRuntimeTransportFactory(),
+                runtimePackageName: "astrolabe-runtime-ios"
+            ),
             compatibilityPolicy: compatibilityPolicy
         )
     }
@@ -116,13 +120,17 @@ package final class AstrolabeIOSRuntimeProvider:
     }
 
     package func fetchHierarchy(appId: String) throws -> [String: Any] {
+        try fetchHierarchy(appId: appId, semanticCapture: nil)
+    }
+
+    package func fetchHierarchy(appId: String, semanticCapture: RuntimeSemanticCaptureOptions?) throws -> [String: Any] {
         let appID = try AstrolabeRuntimeAppID(rawValue: appId)
         let session = try sessionStore.session(for: sessionTarget(for: appID))
         return mapper.hierarchy(
             appID: appID.rawValue,
             handshake: session.handshake,
             appInfo: session.appInfo,
-            snapshot: try session.hierarchySnapshot()
+            snapshot: try session.hierarchySnapshot(semanticCapture: semanticCapture)
         )
     }
 
@@ -135,6 +143,19 @@ package final class AstrolabeIOSRuntimeProvider:
             requestedNodeID: nodeID,
             detail: try session.nodeDetail(nodeID: nodeID)
         )
+    }
+
+    package func preflightNativeNode(appId: String, oid: String) throws {
+        let appID = try AstrolabeRuntimeAppID(rawValue: appId)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
+        try session.preflightNativeNode(nodeID: RuntimeOpaqueIdentifier(rawValue: oid))
+    }
+
+    package func fetchNodeDetail(appId: String, oid: String, runtimeSnapshotID: String) throws -> [String: Any] {
+        let appID = try AstrolabeRuntimeAppID(rawValue: appId)
+        let session = try sessionStore.session(for: sessionTarget(for: appID))
+        let nodeID = try RuntimeOpaqueIdentifier(rawValue: oid)
+        return mapper.nodeDetail(appID: appID.rawValue, requestedNodeID: nodeID, detail: try session.nodeDetail(nodeID: nodeID, snapshotID: RuntimeOpaqueIdentifier(rawValue: runtimeSnapshotID)))
     }
 
     package func applyAttributePatch(
@@ -199,7 +220,7 @@ package final class AstrolabeIOSRuntimeProvider:
         endpoint: AstrolabeRuntimeEndpoint
     ) -> AstrolabeRuntimeDiscoveryResult {
         do {
-            let client = try clientFactory.makeClient(endpoint: endpoint)
+            let client = try discoveryClientFactory.makeClient(endpoint: endpoint)
             defer { client.close() }
             let handshake = try client.handshake()
             let compatibility = compatibilityPolicy.evaluate(handshake: handshake)

@@ -71,7 +71,8 @@ struct AppCommandGroup: CLICommandHandling {
         )
         let resolvedHierarchy = try hierarchyResolver.resolve(
             appId: arguments[1],
-            snapshotIdentifier: snapshotArguments.snapshotIdentifier
+            snapshotIdentifier: snapshotArguments.snapshotIdentifier,
+            semanticCapture: snapshotArguments.semanticCapture
         )
         let projection = hierarchyProjectionBuilder.buildProjection(
             from: resolvedHierarchy.snapshot.hierarchy,

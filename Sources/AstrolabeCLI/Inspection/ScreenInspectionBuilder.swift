@@ -74,6 +74,12 @@ package struct ScreenInspectionBuilder {
             ]
         ]
         copyMetadata(from: hierarchy, to: &inspection)
+        if hierarchy["semanticItems"] != nil {
+            let semanticRecords = records.filter { $0.node["kind"] as? String == "semantic" }
+            inspection["semanticNodeCount"] = semanticRecords.count
+            inspection["semanticItems"] = semanticRecords.prefix(boundedTargetLimit).map { extractor.nodeSnapshot(from: $0) }
+            inspection["omittedSemanticNodeCount"] = max(0, semanticRecords.count - boundedTargetLimit)
+        }
         return inspection
     }
 

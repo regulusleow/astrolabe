@@ -115,6 +115,7 @@ struct HierarchyNodeFinder {
                 ?? (hierarchy["snapshotId"] as? String)
                 ?? UUID().uuidString,
             pageCapturedAt: capturedAt,
+            semanticMetadata: ResolvedPageHierarchy.semanticMetadata(in: hierarchy),
             queryFingerprint: queryFingerprint,
             snapshotFingerprint: snapshotFingerprint,
             nodes: records.map { projectionBuilder.buildProjection(from: $0) }
@@ -156,6 +157,7 @@ struct HierarchyNodeFinder {
             "capturedAtUnixTime": snapshot.pageCapturedAt.timeIntervalSince1970,
             "nodes": page
         ]
+        result.merge(snapshot.semanticMetadata) { stored, _ in stored }
         if nextOffset < snapshot.nodes.count {
             result["nextCursor"] = try cursorCodec.encode(
                 appId: snapshot.appId,

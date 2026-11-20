@@ -18,7 +18,7 @@ package final class AstrolabeIOSRuntimeProvider:
     RuntimeUIPatchCatalogProviding,
     RuntimeUIAttributePatching,
     RuntimeUIAppDiscoveryDiagnosing {
-    package let descriptor = RuntimeUIProviderDescriptor(
+    private static let providerDescriptor = RuntimeUIProviderDescriptor(
         identifier: "astrolabe-ios-runtime",
         platform: .ios,
         capabilities: [
@@ -29,6 +29,7 @@ package final class AstrolabeIOSRuntimeProvider:
             .attributePatching
         ]
     )
+    package var descriptor: RuntimeUIProviderDescriptor { Self.providerDescriptor }
 
     private let endpointDiscovery: any AstrolabeRuntimeEndpointDiscovering
     /// Short-lived discovery probes must not inherit the inspection request timeout.
@@ -50,7 +51,7 @@ package final class AstrolabeIOSRuntimeProvider:
         mapper: AstrolabeRuntimeResponseMapper = AstrolabeRuntimeResponseMapper(),
         compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy =
             AstrolabeRuntimeCompatibilityPolicy(
-                platform: .ios,
+                descriptor: AstrolabeIOSRuntimeProvider.providerDescriptor,
                 runtimePackageName: "astrolabe-runtime-ios"
             )
     ) {

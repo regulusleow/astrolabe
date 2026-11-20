@@ -25,7 +25,8 @@ package struct AstrolabeRuntimeCompatibility {
 package struct AstrolabeRuntimeCompatibilityPolicy {
     private let platform: RuntimeUIPlatform
     private let runtimePackageName: String
-    private let requirementsByProviderCapability: [
+    private let providerRequirements: [RuntimeUICapability: Set<RuntimeCapability>]
+    private static let requirementsByProviderCapability: [
         RuntimeUICapability: Set<RuntimeCapability>
     ] = [
         .appDiscovery: [],
@@ -42,11 +43,14 @@ package struct AstrolabeRuntimeCompatibilityPolicy {
     ]
 
     package init(
-        platform: RuntimeUIPlatform,
+        descriptor: RuntimeUIProviderDescriptor,
         runtimePackageName: String
     ) {
-        self.platform = platform
+        platform = descriptor.platform
         self.runtimePackageName = runtimePackageName
+        providerRequirements = Self.requirementsByProviderCapability.filter {
+            descriptor.capabilities.contains($0.key)
+        }
     }
 
     package func evaluate(
@@ -54,7 +58,7 @@ package struct AstrolabeRuntimeCompatibilityPolicy {
     ) -> AstrolabeRuntimeCompatibility {
         let runtimeCapabilities = Set(handshake.capabilities)
         let isExpectedPlatform = handshake.platform == platform.rawValue
-        let requiredCapabilities = requirementsByProviderCapability.values
+        let requiredCapabilities = providerRequirements.values
             .reduce(into: Set<RuntimeCapability>()) { result, requirements in
                 result.formUnion(requirements)
             }
@@ -100,7 +104,7 @@ package struct AstrolabeRuntimeCompatibilityPolicy {
         _ capability: RuntimeUICapability,
         compatibility: AstrolabeRuntimeCompatibility
     ) throws {
-        guard let requirements = requirementsByProviderCapability[capability] else {
+        guard let requirements = providerRequirements[capability] else {
             throw AstrolabeRuntimeClientError.invalidResponse(
                 "The \(platform.rawValue) Runtime Provider does not define compatibility requirements for \(capability.rawValue)"
             )
@@ -137,7 +141,7 @@ package struct AstrolabeRuntimeCompatibilityPolicy {
         guard isExpectedPlatform else {
             return []
         }
-        return Set(requirementsByProviderCapability.compactMap { capability, requirements in
+        return Set(providerRequirements.compactMap { capability, requirements in
             requirements.isSubset(of: runtimeCapabilities) ? capability : nil
         })
     }

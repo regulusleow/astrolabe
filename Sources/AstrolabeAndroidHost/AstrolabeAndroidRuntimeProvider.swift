@@ -20,7 +20,7 @@ package final class AstrolabeAndroidRuntimeProvider:
     RuntimeUIAttributePatching,
     RuntimeUIAppDiscoveryDiagnosing,
     RuntimeUIProviderLifecycle {
-    package let descriptor = RuntimeUIProviderDescriptor(
+    package static let providerDescriptor = RuntimeUIProviderDescriptor(
         identifier: "astrolabe-android-runtime",
         platform: .android,
         capabilities: [
@@ -31,6 +31,7 @@ package final class AstrolabeAndroidRuntimeProvider:
             .attributePatching
         ]
     )
+    package var descriptor: RuntimeUIProviderDescriptor { Self.providerDescriptor }
 
     private let connectionRegistry: AndroidRuntimeConnectionRegistry
     private let mapper: AstrolabeRuntimeResponseMapper
@@ -48,7 +49,7 @@ package final class AstrolabeAndroidRuntimeProvider:
         mapper: AstrolabeRuntimeResponseMapper = AstrolabeRuntimeResponseMapper(),
         compatibilityPolicy: AstrolabeRuntimeCompatibilityPolicy =
             AstrolabeRuntimeCompatibilityPolicy(
-                platform: .android,
+                descriptor: AstrolabeAndroidRuntimeProvider.providerDescriptor,
                 runtimePackageName: "astrolabe-runtime-android"
             )
     ) {

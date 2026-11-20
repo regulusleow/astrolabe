@@ -62,6 +62,6 @@ struct HierarchyNodeSearchWorkflow {
         if result["hasMore"] as? Bool == true {
             try snapshotStore.save(snapshot)
         }
-        return resolvedHierarchy.addingMetadata(to: result)
+        return result
     }
 }

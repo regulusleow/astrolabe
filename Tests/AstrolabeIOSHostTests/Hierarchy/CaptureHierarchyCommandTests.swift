@@ -66,8 +66,36 @@ final class CaptureHierarchyCommandTests: XCTestCase {
             XCTAssertEqual(service.semanticCaptureOptions?.windowID?.rawValue, "window-2", command)
             let data = try XCTUnwrap(output["data"] as? [String: Any])
             XCTAssertNotEqual(data["snapshotId"] as? String, "runtime-A", command)
-            if command != "find-nodes" { XCTAssertEqual(data["runtimeSnapshotId"] as? String, "runtime-A", command) }
+            XCTAssertEqual(data["runtimeSnapshotId"] as? String, "runtime-A", command)
         }
+    }
+
+    func testCursorPreservesPartialSemanticCaptureAcrossRunners() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let service = Fixtures.FakeInspectorService()
+        let capture: [String: Any] = ["source": "ios.accessibility", "availability": "partial", "wasTruncated": true]
+        service.hierarchy = [
+            "snapshotId": "runtime-A", "capturedAtUnixTime": 100.0, "semanticCapture": capture,
+            "displayItems": [], "semanticItems": ["a", "b"].map {
+                ["oid": $0, "className": "AXNode", "runtimeRole": "text", "kind": "semantic"]
+            }
+        ]
+        func page(_ options: [String]) throws -> [String: Any] {
+            let runner = Fixtures.makeRunner(service: service, paginationSnapshotDirectory: directory)
+            let response = try runner.runJSON(arguments: ["find-nodes", "app-1", "--limit", "1"] + options)
+            return try XCTUnwrap(response["data"] as? [String: Any])
+        }
+        let first = try page(["--include-semantics"])
+        let second = try page(["--cursor", XCTUnwrap(first["nextCursor"] as? String)])
+        XCTAssertEqual(first["snapshotId"] as? String, second["snapshotId"] as? String)
+        XCTAssertEqual(second["hierarchySource"] as? String, "snapshot")
+        for result in [first, second] {
+            XCTAssertEqual(result["runtimeSnapshotId"] as? String, "runtime-A")
+            XCTAssertEqual(result["runtimeCapturedAtUnixTime"] as? Double, 100)
+            XCTAssertEqual(result["semanticCapture"] as? NSDictionary, capture as NSDictionary)
+        }
+        XCTAssertEqual(service.calls.filter { $0 == .fetchHierarchy("app-1") }.count, 1)
     }
 
     func testSemanticDetailWithoutSavedPageNeverCapturesCurrentUI() throws {

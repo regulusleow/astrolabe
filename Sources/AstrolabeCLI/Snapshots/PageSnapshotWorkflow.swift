@@ -72,6 +72,9 @@ enum PageHierarchySource: String {
 }
 
 struct ResolvedPageHierarchy {
+    /// Runtime facts shared by a page snapshot and all of its search results.
+    private static let semanticMetadataKeys = ["runtimeSnapshotId", "runtimeCapturedAtUnixTime", "semanticCapture"]
+
     /// Page hierarchy snapshot used by this command.
     let snapshot: PageHierarchySnapshot
 
@@ -83,10 +86,14 @@ struct ResolvedPageHierarchy {
         result["snapshotId"] = snapshot.identifier
         result["capturedAtUnixTime"] = snapshot.createdAt.timeIntervalSince1970
         result["hierarchySource"] = source.rawValue
-        for key in ["runtimeSnapshotId", "runtimeCapturedAtUnixTime", "semanticCapture"] {
+        for key in Self.semanticMetadataKeys {
             result[key] = snapshot.hierarchy[key]
         }
         return result
+    }
+
+    static func semanticMetadata(in hierarchy: [String: Any]) -> [String: Any] {
+        hierarchy.filter { semanticMetadataKeys.contains($0.key) }
     }
 }
 

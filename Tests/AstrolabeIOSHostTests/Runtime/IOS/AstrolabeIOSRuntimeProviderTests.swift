@@ -75,7 +75,7 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         try provider.preflightNativeNode(appId: appID, oid: "node-1")
         XCTAssertEqual(client.calls.filter { $0 == "hierarchy" }.count, 0)
     }
-    func testSemanticRequestCannotPretendRenderOnlyResponseIsSuccess() throws {
+    func testHierarchyResponseMustMatchRequestedSemanticScope() throws {
         let client = FakeAstrolabeRuntimeClient()
         client.handshakeValue = try makeHandshake(capabilities: [.applicationInfo, .hierarchySnapshot, .semanticInspection])
         client.appInfoValue = try makeAppInfo()
@@ -83,6 +83,10 @@ final class AstrolabeIOSRuntimeProviderTests: XCTestCase {
         let provider = AstrolabeIOSRuntimeProvider(endpointDiscovery: FakeAstrolabeRuntimeEndpointDiscovery(values: []), clientFactory: FakeAstrolabeRuntimeClientFactory(clients: [client]))
         let appID = AstrolabeRuntimeAppID(endpoint: makeEndpoint(), runtimeInstanceIdentifier: "runtime-42").rawValue
         XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID, semanticCapture: RuntimeSemanticCaptureOptions()))
+        client.hierarchyValue = try makeHierarchy(semanticCapture: .init(
+            windowID: .init(rawValue: "window-1"), source: .init(rawValue: "ios.accessibility"),
+            availability: .unavailable, issues: [], visitedNodeCount: 0, wasTruncated: false, roots: []))
+        XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID))
     }
 
     func testSemanticResponseCannotChangeExplicitlyRequestedWindow() throws {

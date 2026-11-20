@@ -86,6 +86,14 @@ final class AstrolabeAndroidRuntimeProviderTests: XCTestCase {
         )
         let appID = try XCTUnwrap(try provider.fetchApps().first?.appId)
 
+        XCTAssertThrowsError(try provider.fetchHierarchy(appId: appID, semanticCapture: .init())) {
+            XCTAssertEqual(($0 as? RuntimeError)?.code, .capabilityUnavailable)
+        }
+        XCTAssertThrowsError(try provider.fetchNodeDetail(appId: appID, oid: "native-1", runtimeSnapshotID: "snapshot-1")) {
+            XCTAssertEqual(($0 as? RuntimeError)?.code, .capabilityUnavailable)
+        }
+        XCTAssertTrue(sessionClient.calls.isEmpty)
+        XCTAssertEqual(probeClient.calls, ["handshake", "appInfo"])
         let hierarchy = try provider.fetchHierarchy(appId: appID)
 
         XCTAssertEqual(hierarchy["appId"] as? String, appID)

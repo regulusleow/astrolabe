@@ -119,8 +119,8 @@ package final class AstrolabeRuntimeClientSession {
         try compatibilityPolicy.require(.hierarchy, compatibility: compatibility)
         if semanticCapture != nil { try requireSemanticInspection() }
         let snapshot = try client.hierarchySnapshot(semanticCapture: semanticCapture)
-        guard semanticCapture == nil || snapshot.semanticCapture != nil else {
-            throw AstrolabeRuntimeClientError.invalidResponse("Semantic capture response is missing semanticCapture")
+        guard (semanticCapture != nil) == (snapshot.semanticCapture != nil) else {
+            throw AstrolabeRuntimeClientError.invalidResponse("Hierarchy response does not match the requested semantic capture scope")
         }
         if let requestedWindow = semanticCapture?.windowID,
            snapshot.semanticCapture?.windowID != requestedWindow {
